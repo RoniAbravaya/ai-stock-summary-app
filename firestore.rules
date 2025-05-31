@@ -1,0 +1,57 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // All authenticated users can read stocks and news
+    match /stocks/{stockId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        resource.data.keys().hasAll(['symbol', 'name', 'price']) &&
+        request.auth.token.admin == true;
+    }
+    
+    match /news/{newsId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // AI Summaries - users can read summaries, only system can write
+    match /summaries/{summaryId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // User favorites - users can manage their own favorites
+    match /favorites/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Subscriptions - users can read their own, admins can read all
+    match /subscriptions/{userId} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || request.auth.token.admin == true);
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Usage tracking - users can read their own usage
+    match /usage/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Admin-only collections
+    match /admin/{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Push notification tokens
+    match /fcmTokens/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

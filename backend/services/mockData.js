@@ -125,56 +125,42 @@ const mockNews = [
 
 const mockSummaries = {
   'AAPL': {
-    id: 'AAPL',
-    stockSymbol: 'AAPL',
-    summary: {
-      en: 'Apple Inc. is showing strong performance with recent iPhone sales exceeding expectations. The company\'s services segment continues to grow, providing recurring revenue. However, concerns about supply chain disruptions in Asia may impact Q1 2024. Overall sentiment: BULLISH. Key factors: strong brand loyalty, expanding services ecosystem, and robust cash flow generation.',
-      es: 'Apple Inc. muestra un rendimiento sólido con las ventas recientes de iPhone superando las expectativas. El segmento de servicios de la empresa continúa creciendo, proporcionando ingresos recurrentes. Sin embargo, las preocupaciones sobre las interrupciones de la cadena de suministro en Asia pueden afectar el Q1 2024.',
-      fr: 'Apple Inc. affiche de solides performances avec les ventes récentes d\'iPhone dépassant les attentes. Le segment des services de l\'entreprise continue de croître, fournissant des revenus récurrents.'
-    },
-    sentiment: 'BULLISH',
-    confidence: 85,
+    title: 'Apple Inc. (AAPL) - AI Analysis',
+    summary: 'Apple continues to show strong fundamentals with robust iPhone sales and growing services revenue. The company\'s move into AI and machine learning presents significant opportunities for future growth. Recent price movements suggest bullish sentiment among investors.',
+    sentiment: 'bullish',
     keyPoints: [
-      'Strong iPhone 15 sales momentum',
-      'Services revenue growing at 15% YoY',
-      'Supply chain resilience improving',
-      'Strong cash position for acquisitions'
+      'Strong iPhone sales in Q4',
+      'Services revenue up 16% YoY',
+      'AI integration driving innovation',
+      'Strong balance sheet with $29B cash'
     ],
     riskFactors: [
-      'China market regulatory uncertainties',
-      'Competition in smartphone market',
-      'Currency exchange rate impacts'
+      'Regulatory scrutiny in EU',
+      'Supply chain challenges',
+      'Market saturation concerns'
     ],
-    priceTarget: 210.00,
-    analystRating: 'BUY',
-    lastUpdated: new Date().toISOString(),
-    language: 'en'
+    recommendation: 'BUY',
+    targetPrice: 210.00,
+    confidenceScore: 0.87
   },
-  'TSLA': {
-    id: 'TSLA',
-    stockSymbol: 'TSLA',
-    summary: {
-      en: 'Tesla continues to lead the EV market with strong delivery numbers and expanding manufacturing capacity. The Cybertruck launch is generating significant interest. Energy storage and solar business showing promising growth. However, increased competition and potential margin pressure remain concerns. Overall sentiment: BULLISH with caution on valuation.',
-      es: 'Tesla continúa liderando el mercado de vehículos eléctricos con sólidos números de entrega y capacidad de fabricación en expansión. El lanzamiento de Cybertruck está generando un interés significativo.',
-      fr: 'Tesla continue de dominer le marché des véhicules électriques avec de solides chiffres de livraison et une capacité de fabrication en expansion.'
-    },
-    sentiment: 'BULLISH',
-    confidence: 78,
+  'GOOGL': {
+    title: 'Alphabet Inc. (GOOGL) - AI Analysis',
+    summary: 'Google\'s dominance in search and growing cloud business position it well for future growth. AI investments through Gemini and Bard show promise, though competition from Microsoft and OpenAI intensifies.',
+    sentiment: 'bullish',
     keyPoints: [
-      'Record quarterly deliveries',
-      'Cybertruck production ramping up',
-      'Energy business growth acceleration',
-      'Full Self-Driving progress'
+      'Search revenue remains strong',
+      'Cloud growth accelerating',
+      'AI investments showing results',
+      'YouTube advertising recovery'
     ],
     riskFactors: [
-      'Increased EV competition',
-      'Regulatory challenges',
-      'Production scaling risks'
+      'Regulatory pressures',
+      'AI competition intensifying',
+      'Economic slowdown impact on ads'
     ],
-    priceTarget: 280.00,
-    analystRating: 'HOLD',
-    lastUpdated: new Date().toISOString(),
-    language: 'en'
+    recommendation: 'HOLD',
+    targetPrice: 2800.00,
+    confidenceScore: 0.82
   }
 };
 
@@ -266,10 +252,85 @@ function getMockUser(userId) {
   };
 }
 
+// Additional methods
+const getAllStocks = () => {
+  return mockStocks;
+};
+
+const getTrendingStocks = () => {
+  return mockStocks
+    .filter(stock => Math.abs(stock.changePercent) > 2)
+    .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
+    .slice(0, 10);
+};
+
+const getStockById = (id) => {
+  return mockStocks.find(stock => stock.id === id || stock.symbol === id);
+};
+
+const getAllNews = () => {
+  return mockNews;
+};
+
+const getNewsByStock = (stockId) => {
+  return mockNews.filter(news => 
+    news.relatedStocks.includes(stockId) || 
+    news.title.toLowerCase().includes(stockId.toLowerCase())
+  );
+};
+
+const generateAISummary = (stockId) => {
+  // Return existing summary or generate a new one
+  if (mockSummaries[stockId]) {
+    return {
+      stockId,
+      ...mockSummaries[stockId],
+      generatedAt: new Date().toISOString(),
+      language: 'en'
+    };
+  }
+
+  // Generate a generic summary for unknown stocks
+  const stock = getStockById(stockId);
+  if (!stock) {
+    throw new Error('Stock not found');
+  }
+
+  return {
+    stockId,
+    title: `${stock.name} (${stock.symbol}) - AI Analysis`,
+    summary: `${stock.name} is currently trading at $${stock.price} with a ${stock.changePercent > 0 ? 'positive' : 'negative'} momentum of ${stock.changePercent}%. Based on current market conditions and technical analysis, the stock shows ${stock.changePercent > 2 ? 'strong bullish' : stock.changePercent < -2 ? 'bearish' : 'mixed'} signals.`,
+    sentiment: stock.changePercent > 1 ? 'bullish' : stock.changePercent < -1 ? 'bearish' : 'neutral',
+    keyPoints: [
+      `Current price: $${stock.price}`,
+      `Daily change: ${stock.changePercent}%`,
+      `Market cap: $${(stock.marketCap / 1e9).toFixed(1)}B`,
+      `P/E ratio: ${stock.pe}`
+    ],
+    riskFactors: [
+      'Market volatility',
+      'Economic uncertainty',
+      'Sector-specific risks'
+    ],
+    recommendation: stock.changePercent > 2 ? 'BUY' : stock.changePercent < -2 ? 'SELL' : 'HOLD',
+    targetPrice: stock.price * (1 + (stock.changePercent / 100) * 0.5),
+    confidenceScore: 0.75,
+    generatedAt: new Date().toISOString(),
+    language: 'en'
+  };
+};
+
 module.exports = {
-  getMockStocks,
-  getMockNews,
-  getMockSummary,
+  getAllStocks,
+  getTrendingStocks,
+  getStockById,
+  getAllNews,
+  getNewsByStock,
+  generateAISummary,
+  // Legacy methods for backward compatibility
+  getMockStocks: getAllStocks,
+  getMockNews: getAllNews,
+  getMockSummary: generateAISummary,
   getMockUsers,
   getMockUser,
   mockStocks,

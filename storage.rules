@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// Craft rules based on data in your Firestore database
+// allow write: if firestore.get(
+//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
+service firebase.storage {
+  match /b/{bucket}/o {
+    // User profile images - users can upload/read their own
+    match /users/{userId}/profile/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Stock logos and images - public read, admin write
+    match /stocks/{stockId}/{allPaths=**} {
+      allow read: if true; // Public read for stock logos
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // News images - public read, admin write
+    match /news/{newsId}/{allPaths=**} {
+      allow read: if true; // Public read for news images
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // App assets - public read, admin write
+    match /assets/{allPaths=**} {
+      allow read: if true; // Public read for app assets
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Admin uploads
+    match /admin/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.token.admin == true;
+    }
+  }
+}

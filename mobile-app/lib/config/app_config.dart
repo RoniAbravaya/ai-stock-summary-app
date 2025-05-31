@@ -65,6 +65,16 @@ class AppConfig {
   static bool get isProduction => const bool.fromEnvironment('dart.vm.product');
   static bool get isDevelopment => !isProduction;
 
+  // App Colors
+  static const int primaryBlue = 0xFF2196F3;
+  static const int primaryGreen = 0xFF4CAF50;
+  static const int primaryRed = 0xFFF44336;
+  static const int backgroundGray = 0xFFF5F5F5;
+  static const int textDark = 0xFF212121;
+  static const int textLight = 0xFF757575;
+  static const int cardBackground = 0xFFFFFFFF;
+  static const int dividerColor = 0xFFE0E0E0;
+
   // Get appropriate API base URL
   static String get apiBaseUrl {
     if (enableMockData && isDevelopment) {
@@ -137,28 +147,16 @@ class ApiEndpoints {
   static const String mockSummary = '/summary/{stockId}';
 }
 
-// App Colors
-class AppColors {
-  static const int primaryBlue = 0xFF2196F3;
-  static const int primaryGreen = 0xFF4CAF50;
-  static const int primaryRed = 0xFFF44336;
-  static const int backgroundGray = 0xFFF5F5F5;
-  static const int textDark = 0xFF212121;
-  static const int textLight = 0xFF757575;
-  static const int cardBackground = 0xFFFFFFFF;
-  static const int dividerColor = 0xFFE0E0E0;
-}
-
 // App Text Styles
 class AppTextStyles {
   static const String fontFamily = 'Roboto';
 
   // Font sizes
-  static const double headingLarge = 24.0;
-  static const double headingMedium = 20.0;
-  static const double headingSmall = 18.0;
-  static const double bodyLarge = 16.0;
-  static const double bodyMedium = 14.0;
-  static const double bodySmall = 12.0;
-  static const double caption = 10.0;
+  static const double headingLarge = 28.0;
+  static const double headingMedium = 24.0;
+  static const double headingSmall = 20.0;
+  static const double bodyLarge = 18.0;
+  static const double bodyMedium = 16.0;
+  static const double bodySmall = 14.0;
+  static const double caption = 12.0;
 }

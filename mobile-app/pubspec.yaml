@@ -39,21 +39,17 @@ dependencies:
   shimmer: ^3.0.0
   
   # Firebase Core & Services
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.15.3
-  cloud_firestore: ^4.13.6
-  firebase_messaging: ^14.7.9
-  firebase_analytics: ^10.7.4
-  firebase_storage: ^11.5.4
-  firebase_crashlytics: ^3.4.9
-  
-  # Web & JavaScript Interop (Required for Firebase Web)
-  js: ^0.6.7
-  web: ^1.1.0
+  firebase_core: ^2.25.4
+  firebase_auth: ^4.16.0
+  cloud_firestore: ^4.14.0
+  firebase_messaging: ^14.7.10
+  firebase_analytics: ^10.8.0
+  firebase_storage: ^11.6.0
+  # firebase_crashlytics: ^3.4.9  # Disabled for development
   
   # Authentication
-  google_sign_in: ^6.1.6
-  flutter_facebook_auth: ^6.0.4
+  google_sign_in: ^6.2.1
+  # flutter_facebook_auth: ^6.0.4  # Removed - causing SDK initialization issues
   
   # HTTP & API Communication
   http: ^1.1.2

@@ -42,10 +42,14 @@ dependencies:
   firebase_core: ^2.24.2
   firebase_auth: ^4.15.3
   cloud_firestore: ^4.13.6
-  firebase_messaging: ^14.7.10
+  firebase_messaging: ^14.7.9
   firebase_analytics: ^10.7.4
-  firebase_storage: ^11.5.6
+  firebase_storage: ^11.5.4
   firebase_crashlytics: ^3.4.9
+  
+  # Web & JavaScript Interop (Required for Firebase Web)
+  js: ^0.6.7
+  web: ^1.1.0
   
   # Authentication
   google_sign_in: ^6.1.6

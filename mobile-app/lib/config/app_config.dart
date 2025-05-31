@@ -13,14 +13,17 @@ class AppConfig {
   static const String mockBaseUrl = 'http://localhost:3000/api/mock';
 
   // Firebase Configuration (to be filled from Firebase console)
-  static const String firebaseProjectId = 'your-firebase-project-id';
-  static const String firebaseApiKey = 'your-firebase-api-key';
-  static const String firebaseAppId = 'your-firebase-app-id';
-  static const String firebaseSenderId = 'your-firebase-sender-id';
-  static const String firebaseStorageBucket = 'your-firebase-storage-bucket';
+  static const String firebaseProjectId = '492701567937';
+  static const String firebaseApiKey =
+      'AIzaSyCbnJWJg7btLbIYKPqzKdfvNmVSwx-Sikw';
+  static const String firebaseAppId = 'new-flutter-ai';
+  static const String firebaseSenderId = '492701567937';
+  static const String firebaseStorageBucket =
+      'new-flutter-ai.firebasestorage.app';
 
   // Google Sign-In Configuration
-  static const String googleClientId = 'your-google-client-id';
+  static const String googleClientId =
+      '192137780571-qf5cdsiaevisaespuegj7v0hnmceejos.apps.googleusercontent.com';
 
   // Facebook Configuration
   static const String facebookAppId = 'your-facebook-app-id';

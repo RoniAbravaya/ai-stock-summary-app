@@ -1,0 +1,211 @@
+# ====================
+# Monorepo .gitignore
+# AI Stock Summary App
+# ====================
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Node modules (all locations)
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ====================
+# Node.js Backend
+# ====================
+
+# Dependency directories
+backend/.pnp
+backend/.pnp.js
+
+# Coverage directory used by tools like istanbul
+backend/coverage/
+backend/.nyc_output
+
+# Grunt intermediate storage
+backend/.grunt
+
+# Bower dependency directory
+backend/bower_components
+
+# node-waf configuration
+backend/.lock-wscript
+
+# Compiled binary addons
+backend/build/Release
+
+# TypeScript v1 declaration files
+backend/typings/
+
+# Optional npm cache directory
+backend/.npm
+
+# Optional eslint cache
+backend/.eslintcache
+
+# Microbundle cache
+backend/.rpt2_cache/
+backend/.rts2_cache_cjs/
+backend/.rts2_cache_es/
+backend/.rts2_cache_umd/
+
+# Optional REPL history
+backend/.node_repl_history
+
+# Output of 'npm pack'
+backend/*.tgz
+
+# Yarn Integrity file
+backend/.yarn-integrity
+
+# ====================
+# Flutter Mobile App
+# ====================
+
+# Flutter/Dart/Pub related
+mobile-app/.dart_tool/
+mobile-app/.flutter-plugins
+mobile-app/.flutter-plugins-dependencies
+mobile-app/.packages
+mobile-app/.pub-cache/
+mobile-app/.pub/
+mobile-app/build/
+mobile-app/flutter_*.png
+
+# Flutter-specific node_modules (shouldn't exist, but just in case)
+mobile-app/package.json
+mobile-app/package-lock.json
+
+# Web related
+mobile-app/lib/generated_plugin_registrant.dart
+
+# Android related
+mobile-app/android/**/gradle-wrapper.jar
+mobile-app/android/.gradle
+mobile-app/android/captures/
+mobile-app/android/gradlew
+mobile-app/android/gradlew.bat
+mobile-app/android/local.properties
+mobile-app/android/**/GeneratedPluginRegistrant.java
+mobile-app/android/.cxx/
+mobile-app/android/key.properties
+mobile-app/android/**/*.keystore
+mobile-app/android/**/*.jks
+
+# iOS/XCode related
+mobile-app/ios/**/*.mode1v3
+mobile-app/ios/**/*.mode2v3
+mobile-app/ios/**/*.moved-aside
+mobile-app/ios/**/*.pbxuser
+mobile-app/ios/**/*.perspectivev3
+mobile-app/ios/**/*sync/
+mobile-app/ios/**/.sconsign.dblite
+mobile-app/ios/**/.tags*
+mobile-app/ios/**/.vagrant/
+mobile-app/ios/**/DerivedData/
+mobile-app/ios/**/Icon?
+mobile-app/ios/**/Pods/
+mobile-app/ios/**/.symlinks/
+mobile-app/ios/**/profile
+mobile-app/ios/**/xcuserdata
+mobile-app/ios/.generated/
+mobile-app/ios/Flutter/Generated.xcconfig
+mobile-app/ios/Flutter/flutter_export_environment.sh
+mobile-app/ios/ServiceDefinitions.json
+mobile-app/ios/Runner/GeneratedPluginRegistrant.*
+
+# macOS
+mobile-app/macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Linux
+mobile-app/linux/flutter/generated_plugin_registrant.cc
+mobile-app/linux/flutter/generated_plugins.cmake
+
+# Windows
+mobile-app/windows/flutter/generated_plugin_registrant.cc
+mobile-app/windows/flutter/generated_plugins.cmake
+
+# ====================
+# IDEs and Editors
+# ====================
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+.vscode/
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ====================
+# Firebase & Secrets
+# ====================
+
+# Firebase config files (add these when you get real config)
+# google-services.json
+# GoogleService-Info.plist
+# firebase-config.js
+
+# Google Services
+mobile-app/android/app/google-services.json
+mobile-app/ios/Runner/GoogleService-Info.plist
+
+# ====================
+# General
+# ====================
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Dependency lock files (comment out if you want to commit them)
+# package-lock.json
+# yarn.lock 

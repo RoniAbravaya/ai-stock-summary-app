@@ -1802,7 +1802,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
   final _searchController = TextEditingController();
 
   String _selectedAudience = 'all_users';
-  List<Map<String, dynamic>> _selectedUsers = [];
+  final List<Map<String, dynamic>> _selectedUsers = [];
   List<Map<String, dynamic>> _searchResults = [];
   bool _isSearching = false;
   bool _isSending = false;
@@ -1817,115 +1817,27 @@ class _NotificationsTabState extends State<NotificationsTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(8), // Reduced from 12
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Notification Content Section
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12), // Reduced from 16
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Notification Content',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 12), // Reduced from 16
-                      TextField(
-                        controller: _titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Title',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        maxLength: 50,
-                      ),
-                      const SizedBox(height: 8), // Reduced
-                      TextField(
-                        controller: _messageController,
-                        decoration: const InputDecoration(
-                          labelText: 'Message',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        maxLines: 3,
-                        maxLength: 200,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8), // Reduced
-              // Audience Selection Section
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12), // Reduced
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Target Audience',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8), // Reduced
-                      DropdownButtonFormField<String>(
-                        value: _selectedAudience,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items:
-                            _audienceOptions.entries.map((entry) {
-                              return DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(entry.value),
-                              );
-                            }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedAudience = value!;
-                            if (value != 'specific_users') {
-                              _selectedUsers.clear();
-                            }
-                          });
-                        },
-                      ),
-                      if (_selectedAudience == 'specific_users') ...[
-                        const SizedBox(height: 8),
-                        _buildUserSelection(),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8), // Reduced
+              // Header
+              _buildHeader(),
+              const SizedBox(height: 20),
+
+              // Notification Content Card
+              _buildNotificationContentCard(),
+              const SizedBox(height: 16),
+
+              // Audience Selection Card
+              _buildAudienceSelectionCard(),
+              const SizedBox(height: 20),
+
               // Send Button
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 8), // Reduced
-                child: ElevatedButton.icon(
-                  onPressed: _isSending ? null : _sendNotification,
-                  icon:
-                      _isSending
-                          ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                          : const Icon(Icons.send),
-                  label: Text(_isSending ? 'Sending...' : 'Send Notification'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8), // Final padding at bottom
+              _buildSendButton(),
             ],
           ),
         ),
@@ -1933,8 +1845,361 @@ class _NotificationsTabState extends State<NotificationsTab> {
     );
   }
 
-  IconData _getAudienceIcon() {
-    switch (_selectedAudience) {
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.blue.shade600, Colors.blue.shade800],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.notifications_active,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Push Notifications',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Send targeted notifications to your users',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationContentCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.edit_note, color: Colors.blue.shade600, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Notification Content',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Title Field
+            _buildInputField(
+              controller: _titleController,
+              label: 'Notification Title',
+              hint: 'Enter a compelling title...',
+              icon: Icons.title,
+              maxLength: 50,
+            ),
+            const SizedBox(height: 16),
+
+            // Message Field
+            _buildInputField(
+              controller: _messageController,
+              label: 'Message Content',
+              hint: 'Write your notification message...',
+              icon: Icons.message,
+              maxLines: 4,
+              maxLength: 200,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    int maxLines = 1,
+    int? maxLength,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          maxLines: maxLines,
+          maxLength: maxLength,
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: Icon(icon, color: Colors.blue.shade600, size: 20),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.grey.shade50,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            counterStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAudienceSelectionCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.group, color: Colors.green.shade600, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Target Audience',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Audience Selector
+            _buildAudienceSelector(),
+
+            // User Selection (if specific users selected)
+            if (_selectedAudience == 'specific_users') ...[
+              const SizedBox(height: 20),
+              _buildUserSelection(),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAudienceSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children:
+            _audienceOptions.entries.map((entry) {
+              final isSelected = _selectedAudience == entry.key;
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedAudience = entry.key;
+                    if (entry.key != 'specific_users') {
+                      _selectedUsers.clear();
+                    }
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color:
+                        isSelected ? Colors.blue.shade50 : Colors.transparent,
+                    border: Border(
+                      bottom:
+                          entry.key != _audienceOptions.keys.last
+                              ? BorderSide(color: Colors.grey.shade200)
+                              : BorderSide.none,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _getAudienceIcon(entry.key),
+                        color:
+                            isSelected
+                                ? Colors.blue.shade600
+                                : Colors.grey.shade600,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          entry.value,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight:
+                                isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                            color:
+                                isSelected
+                                    ? Colors.blue.shade600
+                                    : Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                      if (isSelected)
+                        Icon(
+                          Icons.check_circle,
+                          color: Colors.blue.shade600,
+                          size: 20,
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildSendButton() {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors:
+              _isSending
+                  ? [Colors.grey.shade400, Colors.grey.shade500]
+                  : [Colors.green.shade500, Colors.green.shade600],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: (_isSending ? Colors.grey : Colors.green).withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: _isSending ? null : _sendNotification,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_isSending)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            else
+              const Icon(Icons.send, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              _isSending ? 'Sending Notification...' : 'Send Notification',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getAudienceIcon(String audienceType) {
+    switch (audienceType) {
       case 'free_users':
         return Icons.people_outline;
       case 'premium_users':
@@ -1944,6 +2209,331 @@ class _NotificationsTabState extends State<NotificationsTab> {
       default:
         return Icons.public;
     }
+  }
+
+  Widget _buildUserSelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Select Specific Users',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Search bar
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search users by email...',
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Colors.grey.shade600,
+                    size: 20,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.blue.shade600),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  isDense: true,
+                ),
+                onChanged: _searchUsers,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.blue.shade600,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ElevatedButton(
+                onPressed: _loadAllUsers,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Load All',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        // Selected Users
+        if (_selectedUsers.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              border: Border.all(color: Colors.green.shade200),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: Colors.green.shade600,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Selected Users (${_selectedUsers.length})',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 100,
+                  child: ListView.builder(
+                    itemCount: _selectedUsers.length,
+                    itemBuilder: (context, index) {
+                      final user = _selectedUsers[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: Colors.green.shade100,
+                              child: Text(
+                                (user['email'] ?? '?')[0].toUpperCase(),
+                                style: TextStyle(
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    user['email'] ?? 'Unknown',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  Text(
+                                    user['role'] ?? 'user',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.close,
+                                color: Colors.red.shade400,
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedUsers.removeAt(index);
+                                });
+                              },
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // Search Results
+        if (_searchResults.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.search_outlined,
+                        color: Colors.grey.shade600,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Search Results (${_searchResults.length})',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: _selectAllSearchResults,
+                        icon: Icon(
+                          Icons.select_all,
+                          size: 16,
+                          color: Colors.blue.shade600,
+                        ),
+                        label: Text(
+                          'Select All',
+                          style: TextStyle(
+                            color: Colors.blue.shade600,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final user = _searchResults[index];
+                      final isSelected = _selectedUsers.any(
+                        (selected) => selected['uid'] == user['uid'],
+                      );
+                      return Container(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: Colors.grey.shade200),
+                          ),
+                        ),
+                        child: CheckboxListTile(
+                          dense: true,
+                          value: isSelected,
+                          onChanged: (checked) {
+                            setState(() {
+                              if (checked == true) {
+                                if (!isSelected) {
+                                  _selectedUsers.add(user);
+                                }
+                              } else {
+                                _selectedUsers.removeWhere(
+                                  (selected) => selected['uid'] == user['uid'],
+                                );
+                              }
+                            });
+                          },
+                          title: Text(
+                            user['email'] ?? 'Unknown',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${user['role'] ?? 'user'} • ${user['subscriptionType'] ?? 'free'}',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 11,
+                            ),
+                          ),
+                          secondary: CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.blue.shade100,
+                            child: Text(
+                              (user['email'] ?? '?')[0].toUpperCase(),
+                              style: TextStyle(
+                                color: Colors.blue.shade700,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          activeColor: Colors.blue.shade600,
+                          checkColor: Colors.white,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   void _searchUsers(String query) async {
@@ -2082,13 +2672,35 @@ class _NotificationsTabState extends State<NotificationsTab> {
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
 
@@ -2098,140 +2710,6 @@ class _NotificationsTabState extends State<NotificationsTab> {
     _messageController.dispose();
     _searchController.dispose();
     super.dispose();
-  }
-
-  Widget _buildUserSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Search bar
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  labelText: 'Search Users',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.search),
-                  isDense: true,
-                ),
-                onChanged: _searchUsers,
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: _loadAllUsers,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-              ),
-              child: const Text('Load All'),
-            ),
-          ],
-        ),
-
-        // Selected Users
-        if (_selectedUsers.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Selected Users (${_selectedUsers.length})',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 4),
-          Container(
-            height: 100,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ListView.builder(
-              itemCount: _selectedUsers.length,
-              itemBuilder: (context, index) {
-                final user = _selectedUsers[index];
-                return ListTile(
-                  dense: true,
-                  title: Text(user['email'] ?? 'Unknown'),
-                  subtitle: Text(user['role'] ?? 'user'),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.remove_circle),
-                    onPressed: () {
-                      setState(() {
-                        _selectedUsers.removeAt(index);
-                      });
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-
-        // Search Results
-        if (_searchResults.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Container(
-            height: 150,
-            child: Card(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Search Results (${_searchResults.length})',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: _selectAllSearchResults,
-                          child: const Text('Select All'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: _searchResults.length,
-                      itemBuilder: (context, index) {
-                        final user = _searchResults[index];
-                        final isSelected = _selectedUsers.any(
-                          (selected) => selected['uid'] == user['uid'],
-                        );
-                        return CheckboxListTile(
-                          dense: true,
-                          title: Text(user['email'] ?? 'Unknown'),
-                          subtitle: Text(
-                            '${user['role'] ?? 'user'} • ${user['subscriptionType'] ?? 'free'}',
-                          ),
-                          value: isSelected,
-                          onChanged: (checked) {
-                            setState(() {
-                              if (checked == true) {
-                                if (!isSelected) {
-                                  _selectedUsers.add(user);
-                                }
-                              } else {
-                                _selectedUsers.removeWhere(
-                                  (selected) => selected['uid'] == user['uid'],
-                                );
-                              }
-                            });
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
   }
 }
 
@@ -2251,7 +2729,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
   bool _isLoading = false;
   bool _isProcessing = false;
   int _currentPage = 0;
-  final int _usersPerPage = 20;
+  final int _usersPerPage = 10; // Reduced for better mobile experience
 
   @override
   void initState() {
@@ -2261,341 +2739,432 @@ class _UserManagementTabState extends State<UserManagementTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // Search Section
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(
-                            labelText: 'Search by email',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.search),
-                          ),
-                          onChanged: _filterUsers,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _loadUsers,
-                        child:
-                            _isLoading
-                                ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                                : const Text('Reload'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Total Users: ${_users.length}',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const Spacer(),
-                      Text(
-                        'Showing: ${_getDisplayedUsersInfo()}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ],
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              _buildHeader(),
+
+              // Search Section
+              _buildSearchSection(),
+
+              // Users List
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.6,
+                child: _buildUsersList(),
               ),
-            ),
+            ],
           ),
-
-          const SizedBox(height: 16),
-
-          // Users List
-          Expanded(
-            child: Card(
-              child: Column(
-                children: [
-                  // Header
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(8),
-                        topRight: Radius.circular(8),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          'User Management',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const Spacer(),
-                        if (_filteredUsers.isNotEmpty)
-                          Text(
-                            'Page ${_currentPage + 1} of ${(_filteredUsers.length / _usersPerPage).ceil()}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  // Users List
-                  Expanded(
-                    child:
-                        _filteredUsers.isEmpty
-                            ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.people_outline,
-                                    size: 64,
-                                    color: Colors.grey,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _isLoading
-                                        ? 'Loading users...'
-                                        : 'No users found',
-                                    style:
-                                        Theme.of(context).textTheme.bodyLarge,
-                                  ),
-                                ],
-                              ),
-                            )
-                            : ListView.builder(
-                              itemCount: _getDisplayedUsers().length,
-                              itemBuilder: (context, index) {
-                                final user = _getDisplayedUsers()[index];
-                                return _buildUserTile(user);
-                              },
-                            ),
-                  ),
-
-                  // Pagination
-                  if (_filteredUsers.length > _usersPerPage)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          top: BorderSide(color: Colors.grey.shade300),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          ElevatedButton(
-                            onPressed: _currentPage > 0 ? _previousPage : null,
-                            child: const Text('Previous'),
-                          ),
-                          Text(
-                            'Page ${_currentPage + 1} of ${(_filteredUsers.length / _usersPerPage).ceil()}',
-                          ),
-                          ElevatedButton(
-                            onPressed:
-                                (_currentPage + 1) * _usersPerPage <
-                                        _filteredUsers.length
-                                    ? _nextPage
-                                    : null,
-                            child: const Text('Next'),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildUserTile(Map<String, dynamic> user) {
-    final isAdmin = user['role'] == 'admin';
-    final canPromote = !isAdmin && widget.firebaseEnabled;
-    final currentUserEmail = FirebaseService().auth.currentUser?.email;
-    final canRevoke =
-        isAdmin && widget.firebaseEnabled && user['email'] != currentUserEmail;
-
-    // Debug logging
-    print('🔍 UserTile Debug: ${user['email']}');
-    print('   - isAdmin: $isAdmin');
-    print('   - currentUserEmail: $currentUserEmail');
-    print('   - canPromote: $canPromote');
-    print('   - canRevoke: $canRevoke');
-    print('   - firebaseEnabled: ${widget.firebaseEnabled}');
-
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: isAdmin ? Colors.red.shade100 : Colors.blue.shade100,
-        child: Icon(
-          isAdmin ? Icons.admin_panel_settings : Icons.person,
-          color: isAdmin ? Colors.red.shade700 : Colors.blue.shade700,
+  Widget _buildHeader() {
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.purple.shade600, Colors.purple.shade800],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purple.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      title: Text(user['email'] ?? 'Unknown Email'),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Text('Role: ${user['role'] ?? 'user'}'),
-              if (user['email'] == currentUserEmail) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.people_alt, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'User Management',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    'You',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.blue.shade700,
-                      fontWeight: FontWeight.bold,
-                    ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Manage roles and permissions',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 12,
                   ),
                 ),
               ],
-            ],
+            ),
           ),
-          Text(
-            'Subscription: ${user['subscriptionType'] ?? 'free'} • '
-            'Summaries: ${user['summariesUsed'] ?? 0}/${user['summariesLimit'] ?? 10}',
-          ),
-          // Debug info in UI
-          if (widget.firebaseEnabled) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Debug: canPromote=$canPromote, canRevoke=$canRevoke',
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey.shade600,
-                fontStyle: FontStyle.italic,
+          // Stats
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '${_users.length}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
               ),
             ),
-          ],
-        ],
-      ),
-      trailing: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (canPromote)
-            ElevatedButton.icon(
-              onPressed: _isProcessing ? null : () => _promoteToAdmin(user),
-              icon: const Icon(Icons.admin_panel_settings, size: 16),
-              label: const Text('Promote'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(100, 32),
-              ),
-            )
-          else if (canRevoke)
-            ElevatedButton.icon(
-              onPressed: _isProcessing ? null : () => _revokeAdminRole(user),
-              icon: const Icon(Icons.person_remove, size: 16),
-              label: const Text('Revoke'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(100, 32),
-              ),
-            )
-          else if (isAdmin)
-            Chip(
-              label: Text(
-                user['email'] == currentUserEmail ? 'Admin (You)' : 'Admin',
-                style: const TextStyle(fontSize: 12),
-              ),
-              backgroundColor: Colors.red.shade100,
-              labelStyle: TextStyle(color: Colors.red.shade700),
-            )
-          else
-            Chip(
-              label: const Text('User', style: TextStyle(fontSize: 12)),
-              backgroundColor: Colors.grey.shade100,
-              labelStyle: TextStyle(color: Colors.grey.shade700),
-            ),
+          ),
         ],
       ),
     );
   }
 
-  void _loadUsers() async {
-    if (!widget.firebaseEnabled) {
-      setState(() {
-        _users = [
-          {
-            'email': 'demo@example.com',
-            'role': 'user',
-            'subscriptionType': 'free',
-            'summariesUsed': 3,
-            'summariesLimit': 10,
-          },
-        ];
-        _filteredUsers = _users;
-      });
-      return;
-    }
+  Widget _buildSearchSection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.search, color: Colors.grey.shade600, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Search Users',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-    setState(() {
-      _isLoading = true;
-    });
+          // Search bar and reload button
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search by email...',
+                    hintStyle: const TextStyle(fontSize: 12),
+                    prefixIcon: Icon(
+                      Icons.search_outlined,
+                      color: Colors.grey.shade600,
+                      size: 18,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.purple.shade600),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(fontSize: 12),
+                  onChanged: _filterUsers,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color:
+                      _isLoading
+                          ? Colors.grey.shade400
+                          : Colors.purple.shade600,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _loadUsers,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child:
+                      _isLoading
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                          : const Icon(
+                            Icons.refresh,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                ),
+              ),
+            ],
+          ),
 
-    try {
-      final users = await FirebaseService().getAllUsers();
-      setState(() {
-        _users = users;
-        _filteredUsers = users;
-        _currentPage = 0;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showErrorSnackBar('Error loading users: ${e.toString()}');
-    }
+          const SizedBox(height: 8),
+
+          // Stats row
+          Row(
+            children: [
+              _buildStatChip(
+                'Total Users',
+                '${_users.length}',
+                Icons.people,
+                Colors.blue,
+              ),
+              const SizedBox(width: 12),
+              _buildStatChip(
+                'Showing',
+                _getDisplayedUsersInfo(),
+                Icons.visibility,
+                Colors.green,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
-  void _filterUsers(String query) {
+  Widget _buildStatChip(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: color.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUsersList() {
+    if (_filteredUsers.isEmpty && !_isLoading) {
+      return _buildEmptyState();
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.admin_panel_settings,
+                  color: Colors.grey.shade600,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'User List',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+                const Spacer(),
+                if (_filteredUsers.isNotEmpty)
+                  Text(
+                    'Page ${_currentPage + 1} of ${(_filteredUsers.length / _usersPerPage).ceil()}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+              ],
+            ),
+          ),
+
+          // Users List
+          Expanded(
+            child:
+                _isLoading
+                    ? _buildLoadingState()
+                    : ListView.builder(
+                      itemCount: _getDisplayedUsers().length,
+                      itemBuilder: (context, index) {
+                        final user = _getDisplayedUsers()[index];
+                        return _buildUserTile(user, index);
+                      },
+                    ),
+          ),
+
+          // Pagination
+          if (_filteredUsers.length > _usersPerPage) _buildPagination(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.people_outline, size: 64, color: Colors.grey.shade600),
+          const SizedBox(height: 16),
+          Text(
+            'No users found',
+            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  Widget _buildPagination() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.grey.shade300)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          ElevatedButton(
+            onPressed: _currentPage > 0 ? _previousPage : null,
+            child: const Text('Previous'),
+          ),
+          Text(
+            'Page ${_currentPage + 1} of ${(_filteredUsers.length / _usersPerPage).ceil()}',
+          ),
+          ElevatedButton(
+            onPressed:
+                (_currentPage + 1) * _usersPerPage < _filteredUsers.length
+                    ? _nextPage
+                    : null,
+            child: const Text('Next'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _previousPage() {
     setState(() {
-      if (query.trim().isEmpty) {
-        _filteredUsers = _users;
-      } else {
-        _filteredUsers =
-            _users
-                .where(
-                  (user) =>
-                      user['email']?.toLowerCase().contains(
-                        query.toLowerCase(),
-                      ) ??
-                      false,
-                )
-                .toList();
-      }
-      _currentPage = 0;
+      _currentPage = (_currentPage - 1).clamp(
+        0,
+        (_filteredUsers.length / _usersPerPage).ceil() - 1,
+      );
+    });
+  }
+
+  void _nextPage() {
+    setState(() {
+      _currentPage = (_currentPage + 1).clamp(
+        0,
+        (_filteredUsers.length / _usersPerPage).ceil() - 1,
+      );
     });
   }
 
@@ -2618,47 +3187,386 @@ class _UserManagementTabState extends State<UserManagementTab> {
     return '$startIndex-$endIndex of ${_filteredUsers.length}';
   }
 
-  void _previousPage() {
-    setState(() {
-      _currentPage = (_currentPage - 1).clamp(
-        0,
-        (_filteredUsers.length / _usersPerPage).ceil() - 1,
-      );
-    });
+  Widget _buildUserTile(Map<String, dynamic> user, int index) {
+    final isAdmin = user['role'] == 'admin';
+    final canPromote = !isAdmin && widget.firebaseEnabled;
+    final currentUserEmail = FirebaseService().auth.currentUser?.email;
+    final canRevoke =
+        isAdmin && widget.firebaseEnabled && user['email'] != currentUserEmail;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isAdmin ? Colors.red.shade200 : Colors.grey.shade200,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            // User Info Row
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor:
+                      isAdmin ? Colors.red.shade100 : Colors.blue.shade100,
+                  child: Icon(
+                    isAdmin ? Icons.admin_panel_settings : Icons.person,
+                    color: isAdmin ? Colors.red.shade700 : Colors.blue.shade700,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user['email'] ?? 'Unknown Email',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  isAdmin
+                                      ? Colors.red.shade50
+                                      : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              user['role'] ?? 'user',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color:
+                                    isAdmin
+                                        ? Colors.red.shade700
+                                        : Colors.grey.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              user['subscriptionType'] ?? 'free',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // Action Buttons - Responsive Row
+            Row(
+              children: [
+                if (canPromote) ...[
+                  Expanded(
+                    child: SizedBox(
+                      height: 32,
+                      child: ElevatedButton(
+                        onPressed:
+                            _isProcessing ? null : () => _promoteToAdmin(user),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: const Text(
+                          'Promote',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else if (canRevoke) ...[
+                  Expanded(
+                    child: SizedBox(
+                      height: 32,
+                      child: ElevatedButton(
+                        onPressed:
+                            _isProcessing ? null : () => _revokeAdminRole(user),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: const Text(
+                          'Revoke',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Expanded(
+                    child: Container(
+                      height: 32,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color:
+                            isAdmin ? Colors.red.shade50 : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color:
+                              isAdmin
+                                  ? Colors.red.shade200
+                                  : Colors.grey.shade200,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isAdmin ? Icons.admin_panel_settings : Icons.person,
+                            size: 14,
+                            color:
+                                isAdmin
+                                    ? Colors.red.shade600
+                                    : Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isAdmin ? 'Admin' : 'User',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color:
+                                  isAdmin
+                                      ? Colors.red.shade600
+                                      : Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: IconButton(
+                    onPressed: () => _showUserOptions(user),
+                    icon: Icon(
+                      Icons.more_vert,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.grey.shade100,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  void _nextPage() {
+  void _showUserOptions(Map<String, dynamic> user) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder:
+          (context) => Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'User Actions',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: Icon(
+                    Icons.info_outline,
+                    color: Colors.blue.shade600,
+                  ),
+                  title: const Text('View Details'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showUserDetails(user);
+                  },
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
+  void _showUserDetails(Map<String, dynamic> user) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('User Details'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Email: ${user['email'] ?? 'Unknown'}'),
+                Text('Role: ${user['role'] ?? 'user'}'),
+                Text('Subscription: ${user['subscriptionType'] ?? 'free'}'),
+                Text('Summaries Used: ${user['summariesUsed'] ?? 0}'),
+                Text('Summaries Limit: ${user['summariesLimit'] ?? 10}'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _loadUsers() async {
+    if (!widget.firebaseEnabled) {
+      setState(() {
+        _users = [
+          {
+            'email': 'demo@example.com',
+            'role': 'user',
+            'subscriptionType': 'free',
+            'summariesUsed': 3,
+            'summariesLimit': 10,
+          },
+        ];
+        _filteredUsers = _users;
+      });
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final users = await FirebaseService().getAllUsers();
+      setState(() {
+        _users = users;
+        _filteredUsers = users;
+        _currentPage = 0;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showErrorSnackBar('Error loading users: ${e.toString()}');
+    }
+  }
+
+  void _filterUsers(String query) {
     setState(() {
-      _currentPage = (_currentPage + 1).clamp(
-        0,
-        (_filteredUsers.length / _usersPerPage).ceil() - 1,
-      );
+      _filteredUsers =
+          query.trim().isEmpty
+              ? _users
+              : _users
+                  .where(
+                    (user) =>
+                        user['email']?.toLowerCase().contains(
+                          query.toLowerCase(),
+                        ) ??
+                        false,
+                  )
+                  .toList();
+      _currentPage = 0;
     });
   }
 
   void _promoteToAdmin(Map<String, dynamic> user) async {
     final confirmed = await _showConfirmDialog(
       'Promote to Admin',
-      'Are you sure you want to promote ${user['email']} to admin?\n\n'
-          'This will grant them full administrative privileges.',
+      'Are you sure you want to promote ${user['email']} to admin?',
     );
 
     if (!confirmed) return;
 
-    setState(() {
-      _isProcessing = true;
-    });
+    setState(() => _isProcessing = true);
 
     try {
       await FirebaseService().grantAdminRole(user['email']);
       _showSuccessSnackBar('User promoted to admin successfully!');
-      _loadUsers(); // Reload to show updated role
+      _loadUsers();
     } catch (e) {
       _showErrorSnackBar('Error promoting user: ${e.toString()}');
     } finally {
-      setState(() {
-        _isProcessing = false;
-      });
+      setState(() => _isProcessing = false);
+    }
+  }
+
+  void _revokeAdminRole(Map<String, dynamic> user) async {
+    final confirmed = await _showConfirmDialog(
+      'Revoke Admin Role',
+      'Are you sure you want to revoke the admin role from ${user['email']}?',
+    );
+
+    if (!confirmed) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      await FirebaseService().revokeAdminRole(user['email']);
+      _showSuccessSnackBar('Admin role revoked successfully!');
+      _loadUsers();
+    } catch (e) {
+      _showErrorSnackBar('Error revoking admin role: ${e.toString()}');
+    } finally {
+      setState(() => _isProcessing = false);
     }
   }
 
@@ -2689,40 +3597,36 @@ class _UserManagementTabState extends State<UserManagementTab> {
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
-  }
-
-  void _revokeAdminRole(Map<String, dynamic> user) async {
-    final confirmed = await _showConfirmDialog(
-      'Revoke Admin Role',
-      'Are you sure you want to revoke the admin role from ${user['email']}?\n\n'
-          'This will remove their administrative privileges.',
-    );
-
-    if (!confirmed) return;
-
-    setState(() {
-      _isProcessing = true;
-    });
-
-    try {
-      await FirebaseService().revokeAdminRole(user['email']);
-      _showSuccessSnackBar('Admin role revoked successfully!');
-      _loadUsers(); // Reload to show updated role
-    } catch (e) {
-      _showErrorSnackBar('Error revoking admin role: ${e.toString()}');
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-    }
   }
 
   @override
@@ -2744,27 +3648,11 @@ class StatisticsTab extends StatefulWidget {
 class _StatisticsTabState extends State<StatisticsTab> {
   Map<String, dynamic> _stats = {};
   bool _isLoading = true;
-  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadStats();
-
-    // Set up periodic refresh only if Firebase is enabled
-    if (widget.firebaseEnabled) {
-      _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-        if (mounted) {
-          _loadStats();
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
   }
 
   Future<void> _loadStats() async {
@@ -2780,19 +3668,13 @@ class _StatisticsTabState extends State<StatisticsTab> {
           });
         }
       } else {
-        // Mock stats for offline mode
         if (mounted) {
           setState(() {
             _stats = {
               'totalUsers': 0,
-              'freeUsers': 0,
-              'premiumUsers': 0,
-              'activeUsers': 0,
-              'totalSummaries': 0,
-              'dailyUsage': 0,
-              'monthlyUsage': 0,
-              'recentRegistrations': 0,
-              'errorRate': 0.0,
+              'activeSubscriptions': 0,
+              'summariesGenerated': 0,
+              'systemStatus': 'Offline Mode',
             };
             _isLoading = false;
           });
@@ -2801,9 +3683,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
     } catch (e) {
       print('❌ Error loading stats: $e');
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -2819,208 +3699,28 @@ class _StatisticsTabState extends State<StatisticsTab> {
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
                   children: [
-                    // System Health Status
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.health_and_safety,
-                                  color: _getSystemStatusColor(),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'System Health',
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                              ],
+                            Text(
+                              'System Statistics',
+                              style: Theme.of(context).textTheme.titleLarge,
                             ),
                             const SizedBox(height: 16),
-                            _buildStatRow(
-                              'System Status',
-                              _stats['systemStatus'] ?? 'Unknown',
-                              _getSystemStatusColor(),
+                            Text('Total Users: ${_stats['totalUsers'] ?? 0}'),
+                            Text(
+                              'Premium Users: ${_stats['activeSubscriptions'] ?? 0}',
                             ),
-                            _buildStatRow(
-                              'Last Updated',
-                              DateTime.now().toString().split('.')[0],
-                              Colors.grey,
+                            Text(
+                              'Summaries Generated: ${_stats['summariesGenerated'] ?? 0}',
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // User Statistics
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.people, color: Colors.blue.shade700),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'User Statistics',
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildStatCard(
-                                    'Total Users',
-                                    _stats['totalUsers']?.toString() ?? '0',
-                                    Icons.people_outline,
-                                    Colors.blue,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildStatCard(
-                                    'Premium Users',
-                                    _stats['activeSubscriptions']?.toString() ??
-                                        '0',
-                                    Icons.star,
-                                    Colors.orange,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildStatCard(
-                                    'Free Users',
-                                    _getFreeUsersCount().toString(),
-                                    Icons.person_outline,
-                                    Colors.green,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildStatCard(
-                                    'Active Today',
-                                    _getActiveUsersCount().toString(),
-                                    Icons.trending_up,
-                                    Colors.purple,
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              'System Status: ${_stats['systemStatus'] ?? 'Unknown'}',
                             ),
                           ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Usage Statistics
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.analytics,
-                                  color: Colors.green.shade700,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Usage Statistics',
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            _buildStatRow(
-                              'Total Summaries Generated',
-                              _stats['summariesGenerated']?.toString() ?? '0',
-                              Colors.green.shade700,
-                            ),
-                            _buildStatRow(
-                              'Daily Average',
-                              _getDailyAverage().toString(),
-                              Colors.green.shade500,
-                            ),
-                            _buildStatRow(
-                              'Monthly Average',
-                              _getMonthlyAverage().toString(),
-                              Colors.green.shade300,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Recent Activity
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.history,
-                                  color: Colors.orange.shade700,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Recent Activity',
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            _buildStatRow(
-                              'New Registrations Today',
-                              _getNewRegistrationsToday().toString(),
-                              Colors.orange.shade700,
-                            ),
-                            _buildStatRow(
-                              'Errors (Last 24h)',
-                              _getErrorCount().toString(),
-                              _getErrorCount() > 0 ? Colors.red : Colors.green,
-                            ),
-                            _buildStatRow(
-                              'Peak Usage Hour',
-                              _getPeakUsageHour(),
-                              Colors.orange.shade500,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Refresh Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _loadStats,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Refresh Statistics'),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 48),
                         ),
                       ),
                     ),
@@ -3028,101 +3728,6 @@ class _StatisticsTabState extends State<StatisticsTab> {
                 ),
       ),
     );
-  }
-
-  Widget _buildStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 32),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.bodySmall,
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatRow(String label, String value, Color valueColor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade700)),
-          Text(
-            value,
-            style: TextStyle(fontWeight: FontWeight.w500, color: valueColor),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getSystemStatusColor() {
-    final status = _stats['systemStatus']?.toString().toLowerCase();
-    if (status == 'online') return Colors.green;
-    if (status == 'offline mode') return Colors.orange;
-    return Colors.red;
-  }
-
-  int _getFreeUsersCount() {
-    final total = _stats['totalUsers'] as int? ?? 0;
-    final premium = _stats['activeSubscriptions'] as int? ?? 0;
-    return (total - premium).clamp(0, total);
-  }
-
-  int _getActiveUsersCount() {
-    // Simulated data - in real app, this would come from Firebase analytics
-    final total = _stats['totalUsers'] as int? ?? 0;
-    return (total * 0.3).round(); // Assume 30% of users are active today
-  }
-
-  int _getDailyAverage() {
-    final total = _stats['summariesGenerated'] as int? ?? 0;
-    return (total / 30).round(); // Rough 30-day average
-  }
-
-  int _getMonthlyAverage() {
-    final total = _stats['summariesGenerated'] as int? ?? 0;
-    return total; // Assume current number is monthly total
-  }
-
-  int _getNewRegistrationsToday() {
-    // Simulated data - in real app, this would be calculated from today's registrations
-    return widget.firebaseEnabled ? 2 : 0;
-  }
-
-  int _getErrorCount() {
-    // Simulated data - in real app, this would come from error logging
-    return widget.firebaseEnabled ? 0 : 1;
-  }
-
-  String _getPeakUsageHour() {
-    // Simulated data - in real app, this would be calculated from usage analytics
-    return widget.firebaseEnabled ? '14:00-15:00' : 'N/A';
   }
 }
 

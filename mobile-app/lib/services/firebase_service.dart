@@ -23,7 +23,7 @@ class FirebaseService {
   // Connection status
   bool _isFirestoreAvailable = false;
   DateTime? _lastConnectionCheck;
-  bool _isAuthAvailable = true; // Added for Google Sign-In
+  final bool _isAuthAvailable = true; // Added for Google Sign-In
 
   // Getters
   FirebaseAuth get auth => _auth;
@@ -36,26 +36,116 @@ class FirebaseService {
 
   /// Initialize Firebase services
   Future<void> initialize() async {
+    print('🔧 Initializing Firebase services...');
+
+    // Test Firebase connection first
+    await _checkFirestoreConnection();
+
+    if (!_isFirestoreAvailable) {
+      print('⚠️ Firestore not available, running in offline mode');
+      return;
+    }
+
     try {
-      // Configure Firestore settings for better performance
-      _firestore.settings = const Settings(
-        persistenceEnabled: true,
-        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-      );
-
-      // Check Firestore connection
-      await _checkFirestoreConnection();
-
-      // Request notification permissions
-      await _requestNotificationPermissions();
-
-      // Get FCM token
-      await _getFCMToken();
+      // Initialize FCM token handling according to Firebase documentation
+      await _initializeFCM();
 
       print('✅ Firebase services initialized successfully');
     } catch (e) {
-      print('❌ Error initializing Firebase services: $e');
+      print('❌ Firebase initialization error: $e');
     }
+  }
+
+  /// Initialize Firebase Cloud Messaging according to documentation
+  Future<void> _initializeFCM() async {
+    try {
+      print('🔧 Initializing Firebase Cloud Messaging...');
+
+      // Request notification permissions
+      final messaging = FirebaseMessaging.instance;
+      final settings = await messaging.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        print(
+          '📱 Notification permission granted: ${settings.authorizationStatus}',
+        );
+      } else {
+        print(
+          '⚠️ Notification permission denied: ${settings.authorizationStatus}',
+        );
+      }
+
+      // Get and store FCM registration token according to documentation
+      await _getFCMTokenSafely();
+
+      // Listen for token refresh as recommended in documentation
+      FirebaseMessaging.instance.onTokenRefresh.listen(_onTokenRefresh);
+
+      // Handle foreground messages
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+
+      print('✅ FCM initialization complete');
+    } catch (e) {
+      print('❌ FCM initialization error: $e');
+    }
+  }
+
+  /// Get FCM registration token safely (as per Firebase documentation)
+  Future<void> _getFCMTokenSafely() async {
+    try {
+      // Get FCM registration token as specified in documentation
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        print('📱 FCM Registration Token: ${token.substring(0, 20)}...');
+
+        // Store token in user document for push notifications
+        await _storeFCMToken(token);
+      } else {
+        print('⚠️ Failed to get FCM registration token');
+      }
+    } catch (e) {
+      print('❌ Error getting FCM token: $e');
+    }
+  }
+
+  /// Store FCM token in user document for admin notifications
+  Future<void> _storeFCMToken(String token) async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null && _isFirestoreAvailable) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'fcmToken': token,
+          'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+        });
+        print('✅ FCM token stored in user document');
+      }
+    } catch (e) {
+      print('❌ Error storing FCM token: $e');
+    }
+  }
+
+  /// Handle token refresh (as recommended in Firebase documentation)
+  Future<void> _onTokenRefresh(String token) async {
+    print('🔄 FCM Token refreshed: ${token.substring(0, 20)}...');
+    await _storeFCMToken(token);
+  }
+
+  /// Handle foreground messages (as per Firebase documentation)
+  void _handleForegroundMessage(RemoteMessage message) {
+    print('📨 Foreground message received: ${message.messageId}');
+    print('   - Title: ${message.notification?.title}');
+    print('   - Body: ${message.notification?.body}');
+
+    // You can show in-app notifications here
+    // For now, just log the message
   }
 
   /// Check if Firestore is available and responsive
@@ -81,46 +171,6 @@ class FirebaseService {
     } catch (e) {
       _isFirestoreAvailable = false;
       print('⚠️ Firestore not available: $e');
-    }
-  }
-
-  /// Request notification permissions
-  Future<void> _requestNotificationPermissions() async {
-    try {
-      NotificationSettings settings = await _messaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
-
-      print(
-        '📱 Notification permission granted: ${settings.authorizationStatus}',
-      );
-    } catch (e) {
-      print('⚠️ Notification permission error: $e');
-    }
-  }
-
-  /// Get and store FCM token
-  Future<String?> _getFCMToken() async {
-    try {
-      String? token = await _messaging.getToken();
-      if (token != null && currentUser != null && _isFirestoreAvailable) {
-        // Store token in Firestore with timeout
-        await _firestore
-            .collection('fcmTokens')
-            .doc(currentUser!.uid)
-            .set({'token': token, 'updatedAt': FieldValue.serverTimestamp()})
-            .timeout(const Duration(seconds: 5));
-      }
-      return token;
-    } catch (e) {
-      print('❌ Error getting FCM token: $e');
-      return null;
     }
   }
 
@@ -575,25 +625,6 @@ class FirebaseService {
     }
   }
 
-  /// Safely get FCM token
-  Future<String?> _getFCMTokenSafely() async {
-    try {
-      String? token = await _messaging.getToken();
-      if (token != null && currentUser != null && _isFirestoreAvailable) {
-        // Store token in Firestore with timeout
-        await _firestore
-            .collection('fcmTokens')
-            .doc(currentUser!.uid)
-            .set({'token': token, 'updatedAt': FieldValue.serverTimestamp()})
-            .timeout(const Duration(seconds: 3));
-      }
-      return token;
-    } catch (e) {
-      print('❌ Error getting FCM token safely: $e');
-      return null;
-    }
-  }
-
   /// Sign out
   Future<void> signOut() async {
     try {
@@ -1001,10 +1032,10 @@ class FirebaseService {
       await firestore.collection('admin_notifications').add({
         'title': title,
         'message': message,
-        'target': 'all_users',
+        'type': 'all_users',
         'sentBy': currentUser?.email,
         'sentAt': FieldValue.serverTimestamp(),
-        'processed': false,
+        'status': 'pending',
       });
 
       print('✅ Notification queued for all users');
@@ -1025,11 +1056,11 @@ class FirebaseService {
       await firestore.collection('admin_notifications').add({
         'title': title,
         'message': message,
-        'target': 'specific_user',
-        'targetUserEmail': userEmail,
+        'type': 'specific_user',
+        'targetEmail': userEmail,
         'sentBy': currentUser?.email,
         'sentAt': FieldValue.serverTimestamp(),
-        'processed': false,
+        'status': 'pending',
       });
 
       print('✅ Notification queued for $userEmail');
@@ -1050,11 +1081,11 @@ class FirebaseService {
       await firestore.collection('admin_notifications').add({
         'title': title,
         'message': message,
-        'target': 'user_type',
-        'targetUserType': userType,
+        'type': 'user_type',
+        'userType': userType,
         'sentBy': currentUser?.email,
         'sentAt': FieldValue.serverTimestamp(),
-        'processed': false,
+        'status': 'pending',
       });
 
       print('✅ Notification queued for $userType users');

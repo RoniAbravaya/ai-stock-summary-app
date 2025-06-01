@@ -5,6 +5,8 @@ service cloud.firestore {
     // Users can read/write their own user document
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Allow Cloud Functions to read user documents for FCM tokens
+      allow read: if request.auth.token.admin == true;
     }
     
     // All authenticated users can read stocks and news
@@ -47,6 +49,16 @@ service cloud.firestore {
     // Admin-only collections
     match /admin/{document=**} {
       allow read, write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Admin notifications - for Cloud Functions processing
+    match /admin_notifications/{notificationId} {
+      // Admins can create notifications
+      allow create: if request.auth != null && request.auth.token.admin == true;
+      // Cloud Functions can read and update (no auth required for functions)
+      allow read, update: if true;
+      // Admins can read their own notifications
+      allow read: if request.auth != null && request.auth.token.admin == true;
     }
     
     // Push notification tokens

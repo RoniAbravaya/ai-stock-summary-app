@@ -778,7 +778,7 @@ class DashboardScreen extends StatelessWidget {
 
   void _addToFavorites(BuildContext context, String stockId) async {
     try {
-      if (widget.firebaseEnabled) {
+      if (firebaseEnabled) {
         await FirebaseService().addToFavorites(stockId);
       }
       ScaffoldMessenger.of(
@@ -914,7 +914,7 @@ class FavoritesScreen extends StatelessWidget {
   }
 
   Widget _buildSummaryContent(String stockId) {
-    if (widget.firebaseEnabled) {
+    if (firebaseEnabled) {
       return FutureBuilder<DocumentSnapshot>(
         future: FirebaseService().getStockSummary(stockId),
         builder: (context, summarySnapshot) {
@@ -975,7 +975,7 @@ class FavoritesScreen extends StatelessWidget {
 
   void _removeFromFavorites(BuildContext context, String stockId) async {
     try {
-      if (widget.firebaseEnabled) {
+      if (firebaseEnabled) {
         await FirebaseService().removeFromFavorites(stockId);
       }
       ScaffoldMessenger.of(
@@ -1815,7 +1815,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1953,74 +1953,80 @@ class _NotificationsTabState extends State<NotificationsTab> {
                         ),
                       ),
                     ],
+
+                    // Search Results (for specific users)
+                    if (_searchResults.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        height: 300, // Fixed height to prevent overflow
+                        child: Card(
+                          child: Column(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      'Search Results (${_searchResults.length})',
+                                      style:
+                                          Theme.of(
+                                            context,
+                                          ).textTheme.titleMedium,
+                                    ),
+                                    const Spacer(),
+                                    TextButton(
+                                      onPressed: _selectAllSearchResults,
+                                      child: const Text('Select All'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: ListView.builder(
+                                  itemCount: _searchResults.length,
+                                  itemBuilder: (context, index) {
+                                    final user = _searchResults[index];
+                                    final isSelected = _selectedUsers.any(
+                                      (selected) =>
+                                          selected['uid'] == user['uid'],
+                                    );
+                                    return CheckboxListTile(
+                                      title: Text(user['email'] ?? 'Unknown'),
+                                      subtitle: Text(
+                                        '${user['role'] ?? 'user'} • ${user['subscriptionType'] ?? 'free'}',
+                                      ),
+                                      value: isSelected,
+                                      onChanged: (checked) {
+                                        setState(() {
+                                          if (checked == true) {
+                                            if (!isSelected) {
+                                              _selectedUsers.add(user);
+                                            }
+                                          } else {
+                                            _selectedUsers.removeWhere(
+                                              (selected) =>
+                                                  selected['uid'] ==
+                                                  user['uid'],
+                                            );
+                                          }
+                                        });
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
             ),
           ),
 
-          // Search Results (for specific users)
-          if (_selectedAudience == 'specific_users' &&
-              _searchResults.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Expanded(
-              child: Card(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Search Results (${_searchResults.length})',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: _selectAllSearchResults,
-                            child: const Text('Select All'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _searchResults.length,
-                        itemBuilder: (context, index) {
-                          final user = _searchResults[index];
-                          final isSelected = _selectedUsers.any(
-                            (selected) => selected['uid'] == user['uid'],
-                          );
-                          return CheckboxListTile(
-                            title: Text(user['email'] ?? 'Unknown'),
-                            subtitle: Text(
-                              '${user['role'] ?? 'user'} • ${user['subscriptionType'] ?? 'free'}',
-                            ),
-                            value: isSelected,
-                            onChanged: (checked) {
-                              setState(() {
-                                if (checked == true) {
-                                  if (!isSelected) {
-                                    _selectedUsers.add(user);
-                                  }
-                                } else {
-                                  _selectedUsers.removeWhere(
-                                    (selected) =>
-                                        selected['uid'] == user['uid'],
-                                  );
-                                }
-                              });
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ] else if (_selectedAudience != 'specific_users')
-            const Spacer(),
+          const SizedBox(height: 16),
 
           // Send Button
           Container(
@@ -2042,6 +2048,9 @@ class _NotificationsTabState extends State<NotificationsTab> {
               ),
             ),
           ),
+
+          // Add some bottom padding to ensure no overflow
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -2396,6 +2405,10 @@ class _UserManagementTabState extends State<UserManagementTab> {
   Widget _buildUserTile(Map<String, dynamic> user) {
     final isAdmin = user['role'] == 'admin';
     final canPromote = !isAdmin && widget.firebaseEnabled;
+    final canRevoke =
+        isAdmin &&
+        widget.firebaseEnabled &&
+        user['email'] != FirebaseService().auth.currentUser?.email;
 
     return ListTile(
       leading: CircleAvatar(
@@ -2409,7 +2422,33 @@ class _UserManagementTabState extends State<UserManagementTab> {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Role: ${user['role'] ?? 'user'}'),
+          Row(
+            children: [
+              Text('Role: ${user['role'] ?? 'user'}'),
+              if (user['email'] ==
+                  FirebaseService().auth.currentUser?.email) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'You',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
           Text(
             'Subscription: ${user['subscriptionType'] ?? 'free'} • '
             'Summaries: ${user['summariesUsed'] ?? 0}/${user['summariesLimit'] ?? 10}',
@@ -2427,9 +2466,23 @@ class _UserManagementTabState extends State<UserManagementTab> {
                   foregroundColor: Colors.white,
                 ),
               )
+              : canRevoke
+              ? ElevatedButton.icon(
+                onPressed: _isProcessing ? null : () => _revokeAdminRole(user),
+                icon: const Icon(Icons.person_remove, size: 16),
+                label: const Text('Revoke'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+              )
               : isAdmin
               ? Chip(
-                label: const Text('Admin'),
+                label: Text(
+                  user['email'] == FirebaseService().auth.currentUser?.email
+                      ? 'Admin (You)'
+                      : 'Admin',
+                ),
                 backgroundColor: Colors.red.shade100,
                 labelStyle: TextStyle(color: Colors.red.shade700),
               )
@@ -2592,6 +2645,32 @@ class _UserManagementTabState extends State<UserManagementTab> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.green),
     );
+  }
+
+  void _revokeAdminRole(Map<String, dynamic> user) async {
+    final confirmed = await _showConfirmDialog(
+      'Revoke Admin Role',
+      'Are you sure you want to revoke the admin role from ${user['email']}?\n\n'
+          'This will remove their administrative privileges.',
+    );
+
+    if (!confirmed) return;
+
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      await FirebaseService().revokeAdminRole(user['email']);
+      _showSuccessSnackBar('Admin role revoked successfully!');
+      _loadUsers(); // Reload to show updated role
+    } catch (e) {
+      _showErrorSnackBar('Error revoking admin role: ${e.toString()}');
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
   }
 
   @override

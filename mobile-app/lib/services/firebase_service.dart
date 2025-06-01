@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+// import 'user_data_service.dart'; // Removed
 // import 'package:flutter_facebook_auth/flutter_facebook_auth.dart'; // Removed
 
 /// Firebase Service for Flutter
@@ -142,13 +143,16 @@ class FirebaseService {
 
       if (_isFirestoreAvailable && result.user != null) {
         try {
-          await _updateUserDocument(result.user!);
-          await _getFCMToken();
+          await _updateUserDocumentSafely(result.user!);
+          await _getFCMTokenSafely();
         } catch (firestoreError) {
           print('⚠️ Firestore operations failed: $firestoreError');
           // Don't fail the whole sign-in process for Firestore issues
         }
       }
+
+      // Setup admin user after successful authentication (ensures admin status is correct)
+      await _setupAdminUserAfterAuth();
 
       return result;
     } on FirebaseAuthException catch (e) {
@@ -159,9 +163,30 @@ class FirebaseService {
       // Handle type casting and other errors gracefully
       if (e.toString().contains('PigeonUserDetails') ||
           e.toString().contains('type cast')) {
-        throw Exception(
-          'Authentication service temporarily unavailable. Please try again.',
-        );
+        // Check if authentication was actually successful
+        if (_auth.currentUser != null && _auth.currentUser!.email == email) {
+          print('✅ Sign-in actually successful despite type casting error');
+
+          // Ensure user document is properly updated
+          if (_isFirestoreAvailable) {
+            try {
+              await _updateUserDocumentSafely(_auth.currentUser!);
+            } catch (docError) {
+              print(
+                '⚠️ User document update failed after type cast error: $docError',
+              );
+            }
+          }
+
+          // Setup admin user after successful authentication
+          await _setupAdminUserAfterAuth();
+
+          return null; // Signal successful sign-in despite error
+        } else {
+          throw Exception(
+            'Authentication service temporarily unavailable. Please try again.',
+          );
+        }
       }
       rethrow;
     }
@@ -194,10 +219,14 @@ class FirebaseService {
     String displayName,
   ) async {
     try {
+      print('🔄 Starting email registration for: $email');
+
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      print('✅ Email registration successful for: ${result.user?.email}');
 
       // Ensure we have a valid user before proceeding
       if (result.user == null) {
@@ -207,6 +236,7 @@ class FirebaseService {
       // Update user profile with better error handling
       try {
         await result.user!.updateDisplayName(displayName);
+        print('✅ Display name updated successfully');
       } catch (profileError) {
         print('⚠️ Failed to update display name: $profileError');
         // Continue with registration even if display name update fails
@@ -217,14 +247,18 @@ class FirebaseService {
 
       if (_isFirestoreAvailable && result.user != null) {
         try {
-          // Create user document
-          await _createUserDocument(result.user!);
-          await _getFCMToken();
+          // Create user document with retry mechanism
+          await _createUserDocumentWithRetry(result.user!);
+          await _getFCMTokenSafely();
+          print('✅ User document created successfully');
         } catch (firestoreError) {
           print('⚠️ Firestore operations failed: $firestoreError');
           // Don't fail the whole registration process for Firestore issues
         }
       }
+
+      // Setup admin user after successful authentication (no longer depends on UserDataService)
+      await _setupAdminUserAfterAuth();
 
       return result;
     } on FirebaseAuthException catch (e) {
@@ -232,100 +266,187 @@ class FirebaseService {
       throw Exception(_getAuthErrorMessage(e.code));
     } catch (e) {
       print('❌ Error registering with email: $e');
+
       // Handle type casting and other errors gracefully
       if (e.toString().contains('PigeonUserDetails') ||
-          e.toString().contains('type cast')) {
-        throw Exception(
-          'Registration service temporarily unavailable. Please try again.',
+          e.toString().contains('type cast') ||
+          e.toString().contains('List<Object?>')) {
+        print(
+          '⚠️ Type casting issue detected - checking if registration was successful...',
         );
+
+        // The registration might have been successful despite the error
+        if (_auth.currentUser != null && _auth.currentUser!.email == email) {
+          print(
+            '✅ Registration actually successful despite type casting error',
+          );
+
+          // Ensure user document is created even with type casting error
+          if (_isFirestoreAvailable) {
+            try {
+              await _createUserDocumentWithRetry(_auth.currentUser!);
+            } catch (docError) {
+              print(
+                '⚠️ User document creation failed after type cast error: $docError',
+              );
+            }
+          }
+
+          // Setup admin user after successful authentication
+          await _setupAdminUserAfterAuth();
+
+          // Return success even though there was a type casting error
+          return null; // Signal successful registration despite error
+        } else {
+          throw Exception(
+            'Registration failed due to authentication service error. Please try again.',
+          );
+        }
       }
       rethrow;
     }
   }
 
-  /// Sign in with Google
-  Future<UserCredential?> signInWithGoogle() async {
-    try {
-      // Check if Firebase Auth is available
-      if (!_isAuthAvailable) {
-        throw Exception('Firebase Auth not available');
+  /// Create user document with retry mechanism
+  Future<void> _createUserDocumentWithRetry(User user) async {
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        print('📝 Creating user document (attempt $attempt)...');
+        await _createUserDocumentSafely(user);
+        print('✅ User document created successfully on attempt $attempt');
+        return;
+      } catch (e) {
+        print('❌ User document creation attempt $attempt failed: $e');
+        if (attempt == 3) {
+          print('❌ All user document creation attempts failed');
+          rethrow;
+        }
+        await Future.delayed(Duration(seconds: attempt)); // Progressive delay
       }
+    }
+  }
 
+  /// Sign in with Google
+  Future<UserCredential> signInWithGoogle() async {
+    try {
       print('🔄 Starting Google Sign-In...');
 
-      // Trigger the authentication flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
       if (googleUser == null) {
-        print('❌ Google Sign-In cancelled by user');
-        return null; // User cancelled the sign-in
+        throw Exception('Google Sign-In was cancelled');
       }
 
-      print('✅ Google Sign-In successful for: ${googleUser.email}');
-
-      // Obtain the auth details from the request
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
-        throw Exception('Failed to get Google authentication tokens');
-      }
-
-      // Create a new credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Sign in to Firebase with the Google credential
-      UserCredential result = await _auth.signInWithCredential(credential);
+      final userCredential = await _auth.signInWithCredential(credential);
+      print('✅ Google Sign-In successful for: ${userCredential.user?.email}');
 
-      if (result.user == null) {
-        throw Exception('Failed to sign in with Firebase');
-      }
-
-      print('🎉 Firebase sign-in successful');
-
-      // Check Firestore connection before proceeding
+      // Check Firestore connection and update/create user document
       await _checkFirestoreConnection();
 
-      // Only attempt Firestore operations if available and avoid type casting issues
-      if (_isFirestoreAvailable && result.user != null) {
+      if (_isFirestoreAvailable && userCredential.user != null) {
         try {
-          // Use Future.delayed to avoid immediate type casting issues
-          await Future.delayed(const Duration(milliseconds: 100));
-          await _updateUserDocumentSafely(result.user!);
+          await _updateUserDocumentSafely(userCredential.user!);
           await _getFCMTokenSafely();
         } catch (firestoreError) {
-          print(
-            '⚠️ Firestore operations failed (continuing in offline mode): $firestoreError',
-          );
-          // Continue without throwing - user can still use the app
+          print('⚠️ Firestore operations failed: $firestoreError');
         }
-      } else {
-        print('⚠️ Firestore unavailable - operating in offline mode');
       }
 
-      return result;
+      // Setup admin user after successful authentication
+      await _setupAdminUserAfterAuth();
+
+      return userCredential;
     } catch (e) {
       print('❌ Error signing in with Google: $e');
 
-      // Handle specific type casting errors without breaking the auth flow
-      if (e.toString().contains('PigeonUserDetails') ||
-          e.toString().contains('type cast') ||
-          e.toString().contains('List<Object?>')) {
+      // Check if this is the known type casting error
+      if (e.toString().contains('List<Object?>') &&
+          e.toString().contains('PigeonUserDetails')) {
         print(
-          '⚠️ Type casting issue detected - this is a known Firebase plugin bug',
+          '! Type casting issue detected - this is a known Firebase plugin bug',
         );
 
-        // Still try to return a valid credential if auth was successful
+        // The authentication was actually successful, just the return type casting failed
         if (_auth.currentUser != null) {
           print('✅ Authentication still successful despite type casting error');
-          return null; // Signal success but avoid the problematic operations
+
+          // Ensure user document is properly created/updated
+          if (_isFirestoreAvailable) {
+            try {
+              await _updateUserDocumentSafely(_auth.currentUser!);
+            } catch (docError) {
+              print(
+                '⚠️ User document update failed after type cast error: $docError',
+              );
+            }
+          }
+
+          // Setup admin user after successful authentication
+          await _setupAdminUserAfterAuth();
+
+          // Return success even though there was a type casting error
+          return Future.value(_auth.currentUser as UserCredential);
         }
       }
 
-      return null;
+      rethrow;
+    }
+  }
+
+  /// Setup admin user after authentication
+  Future<void> _setupAdminUserAfterAuth() async {
+    try {
+      print('🔧 Setting up admin user after authentication...');
+
+      // Handle admin setup directly without UserDataService dependency
+      final currentUser = _auth.currentUser;
+      if (currentUser != null && _isFirestoreAvailable) {
+        try {
+          // Check if user document exists and create/update if needed
+          DocumentSnapshot userDoc = await _firestore
+              .collection('users')
+              .doc(currentUser.uid)
+              .get()
+              .timeout(const Duration(seconds: 5));
+
+          if (!userDoc.exists) {
+            // Document doesn't exist, create it with proper admin setup
+            await _createUserDocumentSafely(currentUser);
+          } else {
+            // Document exists, but verify admin status for erolrony91@gmail.com
+            final userData = userDoc.data() as Map<String, dynamic>?;
+            if (currentUser.email?.toLowerCase() == 'erolrony91@gmail.com' &&
+                userData?['role'] != 'admin') {
+              print('🔧 Promoting erolrony91@gmail.com to admin...');
+              await _firestore
+                  .collection('users')
+                  .doc(currentUser.uid)
+                  .update({
+                    'role': 'admin',
+                    'subscriptionType': 'admin',
+                    'summariesLimit': 1000,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  })
+                  .timeout(const Duration(seconds: 5));
+              print('✅ Admin role updated for erolrony91@gmail.com');
+            }
+          }
+        } catch (e) {
+          print('⚠️ Admin setup error: $e');
+        }
+      }
+
+      print('✅ Admin user setup completed after authentication');
+    } catch (e) {
+      print('⚠️ Admin user setup failed: $e');
     }
   }
 
@@ -384,43 +505,69 @@ class FirebaseService {
   /// Safely create user document
   Future<void> _createUserDocumentSafely(User user) async {
     try {
-      // Check if this is the first user (admin)
+      print('📝 Creating user document for: ${user.email}');
+
+      // Check if this is the first user (admin) with better error handling
       bool isFirstUser = false;
       try {
         QuerySnapshot users = await _firestore
             .collection('users')
             .limit(1)
             .get()
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(seconds: 5));
         isFirstUser = users.docs.isEmpty;
+        print(
+          '📊 First user check: $isFirstUser (${users.docs.length} existing users)',
+        );
       } catch (e) {
         print('⚠️ Could not check for first user: $e');
         isFirstUser = false; // Default to regular user
       }
 
-      String userRole = isFirstUser ? 'admin' : 'user';
+      // Check if this is the admin email
+      bool isAdminEmail = user.email?.toLowerCase() == 'erolrony91@gmail.com';
+      String userRole = (isFirstUser || isAdminEmail) ? 'admin' : 'user';
+      int summariesLimit = (isFirstUser || isAdminEmail) ? 1000 : 10;
+      String subscriptionType =
+          (isFirstUser || isAdminEmail) ? 'admin' : 'free';
+
+      print(
+        '👤 User role determined: $userRole (firstUser: $isFirstUser, adminEmail: $isAdminEmail)',
+      );
+
+      // Normalize email for consistent search
+      final normalizedEmail = user.email?.toLowerCase() ?? '';
+
+      final userData = {
+        'email': normalizedEmail,
+        'displayName': user.displayName ?? user.email?.split('@')[0] ?? 'User',
+        'photoURL': user.photoURL,
+        'role': userRole,
+        'subscriptionType': subscriptionType,
+        'summariesUsed': 0,
+        'summariesLimit': summariesLimit,
+        'lastResetDate': FieldValue.serverTimestamp(),
+        'registrationDate': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      print(
+        '📝 User data to save: ${userData.toString().replaceAll(RegExp(r'FieldValue.*'), 'FieldValue')}',
+      );
 
       await _firestore
           .collection('users')
           .doc(user.uid)
-          .set({
-            'email': user.email,
-            'displayName': user.displayName,
-            'photoURL': user.photoURL,
-            'role': userRole,
-            'subscriptionType': 'free',
-            'summariesUsed': 0,
-            'summariesLimit': isFirstUser ? 100 : 10,
-            'lastResetDate': FieldValue.serverTimestamp(),
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          })
-          .timeout(const Duration(seconds: 5));
+          .set(userData)
+          .timeout(const Duration(seconds: 10));
 
-      print('✅ User document created successfully - Role: $userRole');
+      print(
+        '✅ User document created successfully - Role: $userRole, Email: $normalizedEmail',
+      );
 
-      if (isFirstUser) {
-        print('🔥 First user registered - Admin privileges granted');
+      if (isFirstUser || isAdminEmail) {
+        print('🔥 Admin user created - Admin privileges granted');
       }
     } catch (e) {
       print('❌ Error creating user document safely: $e');
@@ -662,5 +809,303 @@ class FirebaseService {
         .doc(stockId)
         .get()
         .timeout(const Duration(seconds: 5));
+  }
+
+  /// Admin Functions
+
+  /// Get all users (admin only) - improved with better error handling
+  Future<List<Map<String, dynamic>>> getAllUsers() async {
+    if (!isFirestoreAvailable) {
+      throw Exception('Firestore not available');
+    }
+
+    try {
+      print('🔍 Admin: Fetching all users...');
+      final querySnapshot = await firestore.collection('users').get();
+      print('🔍 Admin: Found ${querySnapshot.docs.length} users in database');
+
+      final users =
+          querySnapshot.docs.map((doc) {
+            final data = doc.data();
+            data['uid'] = doc.id;
+            print(
+              '📋 User found: ${data['email']} - Role: ${data['role']} - UID: ${doc.id}',
+            );
+            return data;
+          }).toList();
+
+      return users;
+    } catch (e) {
+      print('❌ Error fetching all users: $e');
+      throw Exception('Failed to fetch users: $e');
+    }
+  }
+
+  /// Search users by email (admin only) - improved with better search
+  Future<List<Map<String, dynamic>>> searchUsersByEmail(String email) async {
+    if (!isFirestoreAvailable) {
+      throw Exception('Firestore not available');
+    }
+
+    try {
+      print('🔍 Admin: Searching for users with email containing: "$email"');
+
+      // If email is empty, return all users
+      if (email.trim().isEmpty) {
+        return await getAllUsers();
+      }
+
+      // Try exact match first
+      final exactQuery =
+          await firestore
+              .collection('users')
+              .where('email', isEqualTo: email.toLowerCase())
+              .get();
+
+      print('🔍 Admin: Exact match found ${exactQuery.docs.length} users');
+
+      // If no exact match, try prefix search
+      List<QueryDocumentSnapshot> allDocs = exactQuery.docs.toList();
+
+      if (exactQuery.docs.isEmpty) {
+        final prefixQuery =
+            await firestore
+                .collection('users')
+                .where('email', isGreaterThanOrEqualTo: email.toLowerCase())
+                .where(
+                  'email',
+                  isLessThanOrEqualTo: '${email.toLowerCase()}\uf8ff',
+                )
+                .limit(20)
+                .get();
+
+        print('🔍 Admin: Prefix search found ${prefixQuery.docs.length} users');
+        allDocs = prefixQuery.docs.toList();
+      }
+
+      // If still no results, get all users and filter manually
+      if (allDocs.isEmpty) {
+        print(
+          '🔍 Admin: No prefix matches, getting all users for manual filtering',
+        );
+        final allUsers = await firestore.collection('users').get();
+        allDocs =
+            allUsers.docs.where((doc) {
+              final userData = doc.data();
+              final userEmail =
+                  userData['email']?.toString().toLowerCase() ?? '';
+              return userEmail.contains(email.toLowerCase());
+            }).toList();
+
+        print('🔍 Admin: Manual filtering found ${allDocs.length} users');
+      }
+
+      final results =
+          allDocs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            data['uid'] = doc.id;
+            print(
+              '📋 Search result: ${data['email']} - Role: ${data['role']} - UID: ${doc.id}',
+            );
+            return data;
+          }).toList();
+
+      return results;
+    } catch (e) {
+      print('❌ Error searching users: $e');
+      throw Exception('Failed to search users: $e');
+    }
+  }
+
+  /// Grant admin role to user (admin only) - improved with better feedback
+  Future<void> grantAdminRole(String userEmail) async {
+    if (!isFirestoreAvailable) {
+      throw Exception('Firestore not available');
+    }
+
+    try {
+      print('🔧 Admin: Granting admin role to $userEmail');
+
+      // Find user by email
+      final querySnapshot =
+          await firestore
+              .collection('users')
+              .where('email', isEqualTo: userEmail.toLowerCase())
+              .limit(1)
+              .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        throw Exception('User not found with email: $userEmail');
+      }
+
+      final userDoc = querySnapshot.docs.first;
+      await userDoc.reference.update({
+        'role': 'admin',
+        'subscriptionType': 'admin',
+        'summariesLimit': 1000,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('✅ Admin role granted to $userEmail');
+    } catch (e) {
+      print('❌ Error granting admin role: $e');
+      throw Exception('Failed to grant admin role: $e');
+    }
+  }
+
+  /// Revoke admin role from user (admin only) - improved with better feedback
+  Future<void> revokeAdminRole(String userEmail) async {
+    if (!isFirestoreAvailable) {
+      throw Exception('Firestore not available');
+    }
+
+    try {
+      print('🔧 Admin: Revoking admin role from $userEmail');
+
+      // Find user by email
+      final querySnapshot =
+          await firestore
+              .collection('users')
+              .where('email', isEqualTo: userEmail.toLowerCase())
+              .limit(1)
+              .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        throw Exception('User not found with email: $userEmail');
+      }
+
+      final userDoc = querySnapshot.docs.first;
+      await userDoc.reference.update({
+        'role': 'user',
+        'subscriptionType': 'free',
+        'summariesLimit': 10,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('✅ Admin role revoked from $userEmail');
+    } catch (e) {
+      print('❌ Error revoking admin role: $e');
+      throw Exception('Failed to revoke admin role: $e');
+    }
+  }
+
+  /// Send push notification to all users (admin only)
+  Future<void> sendNotificationToAllUsers(String title, String message) async {
+    try {
+      // Store notification in Firebase for the Cloud Function to process
+      await firestore.collection('admin_notifications').add({
+        'title': title,
+        'message': message,
+        'target': 'all_users',
+        'sentBy': currentUser?.email,
+        'sentAt': FieldValue.serverTimestamp(),
+        'processed': false,
+      });
+
+      print('✅ Notification queued for all users');
+    } catch (e) {
+      print('❌ Error sending notification: $e');
+      throw Exception('Failed to send notification: $e');
+    }
+  }
+
+  /// Send push notification to specific user (admin only)
+  Future<void> sendNotificationToUser(
+    String userEmail,
+    String title,
+    String message,
+  ) async {
+    try {
+      // Store notification in Firebase for the Cloud Function to process
+      await firestore.collection('admin_notifications').add({
+        'title': title,
+        'message': message,
+        'target': 'specific_user',
+        'targetUserEmail': userEmail,
+        'sentBy': currentUser?.email,
+        'sentAt': FieldValue.serverTimestamp(),
+        'processed': false,
+      });
+
+      print('✅ Notification queued for $userEmail');
+    } catch (e) {
+      print('❌ Error sending notification: $e');
+      throw Exception('Failed to send notification: $e');
+    }
+  }
+
+  /// Send push notification to user type (admin only)
+  Future<void> sendNotificationToUserType(
+    String userType,
+    String title,
+    String message,
+  ) async {
+    try {
+      // Store notification in Firebase for the Cloud Function to process
+      await firestore.collection('admin_notifications').add({
+        'title': title,
+        'message': message,
+        'target': 'user_type',
+        'targetUserType': userType,
+        'sentBy': currentUser?.email,
+        'sentAt': FieldValue.serverTimestamp(),
+        'processed': false,
+      });
+
+      print('✅ Notification queued for $userType users');
+    } catch (e) {
+      print('❌ Error sending notification: $e');
+      throw Exception('Failed to send notification: $e');
+    }
+  }
+
+  /// Get system statistics (admin only)
+  Future<Map<String, dynamic>> getSystemStats() async {
+    if (!isFirestoreAvailable) {
+      return {
+        'totalUsers': 'Offline',
+        'activeSubscriptions': 'Offline',
+        'summariesGenerated': 'Offline',
+        'systemStatus': 'Offline Mode',
+      };
+    }
+
+    try {
+      // Get total users count
+      final usersSnapshot = await firestore.collection('users').count().get();
+      final totalUsers = usersSnapshot.count ?? 0;
+
+      // Get premium users count
+      final premiumSnapshot =
+          await firestore
+              .collection('users')
+              .where('subscriptionType', isEqualTo: 'premium')
+              .count()
+              .get();
+      final premiumUsers = premiumSnapshot.count ?? 0;
+
+      // Get total summaries generated (sum of all users' summariesUsed)
+      final usersData = await firestore.collection('users').get();
+      int totalSummaries = 0;
+      for (final doc in usersData.docs) {
+        final data = doc.data();
+        totalSummaries += (data['summariesUsed'] as int? ?? 0);
+      }
+
+      return {
+        'totalUsers': totalUsers,
+        'activeSubscriptions': premiumUsers,
+        'summariesGenerated': totalSummaries,
+        'systemStatus': 'Online',
+      };
+    } catch (e) {
+      print('❌ Error fetching system stats: $e');
+      return {
+        'totalUsers': 'Error',
+        'activeSubscriptions': 'Error',
+        'summariesGenerated': 'Error',
+        'systemStatus': 'Error',
+      };
+    }
   }
 }

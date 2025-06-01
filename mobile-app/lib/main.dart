@@ -896,7 +896,7 @@ class FavoritesScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 12), // Reduced spacing
             ElevatedButton.icon(
               onPressed: () => _generateAISummary(context, stockId),
               icon: const Icon(Icons.auto_awesome),
@@ -1818,7 +1818,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12), // Reduced from 16 to 12
           child: ConstrainedBox(
             constraints: BoxConstraints(
               minHeight: constraints.maxHeight - 32, // Account for padding
@@ -2046,7 +2046,9 @@ class _NotificationsTabState extends State<NotificationsTab> {
                   // Send Button (always at bottom)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                    ), // Reduced from 16
                     child: ElevatedButton.icon(
                       onPressed: _isSending ? null : _sendNotification,
                       icon:

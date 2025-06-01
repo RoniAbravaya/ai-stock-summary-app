@@ -917,75 +917,80 @@ class FirebaseService {
     }
   }
 
-  /// Grant admin role to user (admin only) - improved with better feedback
-  Future<void> grantAdminRole(String userEmail) async {
-    if (!isFirestoreAvailable) {
-      throw Exception('Firestore not available');
-    }
-
+  /// Grant admin role to a user by email
+  Future<void> grantAdminRole(String email) async {
     try {
-      print('🔧 Admin: Granting admin role to $userEmail');
+      print('🔧 Admin: Granting admin role to $email...');
 
-      // Find user by email
-      final querySnapshot =
-          await firestore
+      if (!_isFirestoreAvailable) {
+        throw Exception('Firestore is not available');
+      }
+
+      // Find the user by email
+      QuerySnapshot userQuery =
+          await _firestore
               .collection('users')
-              .where('email', isEqualTo: userEmail.toLowerCase())
+              .where('email', isEqualTo: email.toLowerCase().trim())
               .limit(1)
               .get();
 
-      if (querySnapshot.docs.isEmpty) {
-        throw Exception('User not found with email: $userEmail');
+      if (userQuery.docs.isEmpty) {
+        throw Exception('User not found with email: $email');
       }
 
-      final userDoc = querySnapshot.docs.first;
+      DocumentSnapshot userDoc = userQuery.docs.first;
+
+      // Update user role to admin
       await userDoc.reference.update({
         'role': 'admin',
-        'subscriptionType': 'admin',
-        'summariesLimit': 1000,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      print('✅ Admin role granted to $userEmail');
+      print('✅ Admin: Successfully granted admin role to $email');
     } catch (e) {
-      print('❌ Error granting admin role: $e');
-      throw Exception('Failed to grant admin role: $e');
+      print('❌ Admin: Error granting admin role to $email: $e');
+      rethrow;
     }
   }
 
-  /// Revoke admin role from user (admin only) - improved with better feedback
-  Future<void> revokeAdminRole(String userEmail) async {
-    if (!isFirestoreAvailable) {
-      throw Exception('Firestore not available');
-    }
-
+  /// Revoke admin role from a user by email (demote to regular user)
+  Future<void> revokeAdminRole(String email) async {
     try {
-      print('🔧 Admin: Revoking admin role from $userEmail');
+      print('🔧 Admin: Revoking admin role from $email...');
 
-      // Find user by email
-      final querySnapshot =
-          await firestore
+      if (!_isFirestoreAvailable) {
+        throw Exception('Firestore is not available');
+      }
+
+      // Prevent self-demotion
+      if (_auth.currentUser?.email?.toLowerCase() == email.toLowerCase()) {
+        throw Exception('You cannot revoke your own admin privileges');
+      }
+
+      // Find the user by email
+      QuerySnapshot userQuery =
+          await _firestore
               .collection('users')
-              .where('email', isEqualTo: userEmail.toLowerCase())
+              .where('email', isEqualTo: email.toLowerCase().trim())
               .limit(1)
               .get();
 
-      if (querySnapshot.docs.isEmpty) {
-        throw Exception('User not found with email: $userEmail');
+      if (userQuery.docs.isEmpty) {
+        throw Exception('User not found with email: $email');
       }
 
-      final userDoc = querySnapshot.docs.first;
+      DocumentSnapshot userDoc = userQuery.docs.first;
+
+      // Update user role to regular user
       await userDoc.reference.update({
         'role': 'user',
-        'subscriptionType': 'free',
-        'summariesLimit': 10,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      print('✅ Admin role revoked from $userEmail');
+      print('✅ Admin: Successfully revoked admin role from $email');
     } catch (e) {
-      print('❌ Error revoking admin role: $e');
-      throw Exception('Failed to revoke admin role: $e');
+      print('❌ Admin: Error revoking admin role from $email: $e');
+      rethrow;
     }
   }
 

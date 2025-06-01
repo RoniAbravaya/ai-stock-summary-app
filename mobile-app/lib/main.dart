@@ -1815,244 +1815,264 @@ class _NotificationsTabState extends State<NotificationsTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Notification Content Section
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Notification Content',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _titleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Notification Title',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.title),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(
-                      labelText: 'Notification Message',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.message),
-                    ),
-                    maxLines: 3,
-                  ),
-                ],
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight - 32, // Account for padding
             ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Audience Selection Section
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+            child: IntrinsicHeight(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Target Audience',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedAudience,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.group),
-                    ),
-                    items:
-                        _audienceOptions.entries
-                            .map(
-                              (entry) => DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(entry.value),
-                              ),
-                            )
-                            .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedAudience = value!;
-                        if (value != 'specific_users') {
-                          _selectedUsers.clear();
-                        }
-                      });
-                    },
-                  ),
-
-                  // Specific Users Selection
-                  if (_selectedAudience == 'specific_users') ...[
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: const InputDecoration(
-                              labelText: 'Search Users',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.search),
-                            ),
-                            onChanged: _searchUsers,
+                  // Notification Content Section
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Notification Content',
+                            style: Theme.of(context).textTheme.titleLarge,
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: _loadAllUsers,
-                          child: const Text('Load All'),
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _titleController,
+                            decoration: const InputDecoration(
+                              labelText: 'Notification Title',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.title),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _messageController,
+                            decoration: const InputDecoration(
+                              labelText: 'Notification Message',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.message),
+                            ),
+                            maxLines: 3,
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
 
-                    // Selected Users
-                    if (_selectedUsers.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'Selected Users (${_selectedUsers.length})',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: 100,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ListView.builder(
-                          itemCount: _selectedUsers.length,
-                          itemBuilder: (context, index) {
-                            final user = _selectedUsers[index];
-                            return ListTile(
-                              dense: true,
-                              title: Text(user['email'] ?? 'Unknown'),
-                              subtitle: Text(user['role'] ?? 'user'),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.remove_circle),
-                                onPressed: () {
-                                  setState(() {
-                                    _selectedUsers.removeAt(index);
-                                  });
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 16),
 
-                    // Search Results (for specific users)
-                    if (_searchResults.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        height: 300, // Fixed height to prevent overflow
-                        child: Card(
-                          child: Column(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      'Search Results (${_searchResults.length})',
-                                      style:
-                                          Theme.of(
-                                            context,
-                                          ).textTheme.titleMedium,
-                                    ),
-                                    const Spacer(),
-                                    TextButton(
-                                      onPressed: _selectAllSearchResults,
-                                      child: const Text('Select All'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: ListView.builder(
-                                  itemCount: _searchResults.length,
-                                  itemBuilder: (context, index) {
-                                    final user = _searchResults[index];
-                                    final isSelected = _selectedUsers.any(
-                                      (selected) =>
-                                          selected['uid'] == user['uid'],
-                                    );
-                                    return CheckboxListTile(
-                                      title: Text(user['email'] ?? 'Unknown'),
-                                      subtitle: Text(
-                                        '${user['role'] ?? 'user'} • ${user['subscriptionType'] ?? 'free'}',
+                  // Audience Selection Section
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Target Audience',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            value: _selectedAudience,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.group),
+                            ),
+                            items:
+                                _audienceOptions.entries
+                                    .map(
+                                      (entry) => DropdownMenuItem(
+                                        value: entry.key,
+                                        child: Text(entry.value),
                                       ),
-                                      value: isSelected,
-                                      onChanged: (checked) {
-                                        setState(() {
-                                          if (checked == true) {
-                                            if (!isSelected) {
-                                              _selectedUsers.add(user);
-                                            }
-                                          } else {
-                                            _selectedUsers.removeWhere(
-                                              (selected) =>
-                                                  selected['uid'] ==
-                                                  user['uid'],
-                                            );
-                                          }
-                                        });
-                                      },
+                                    )
+                                    .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedAudience = value!;
+                                if (value != 'specific_users') {
+                                  _selectedUsers.clear();
+                                }
+                              });
+                            },
+                          ),
+
+                          // Specific Users Selection
+                          if (_selectedAudience == 'specific_users') ...[
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Search Users',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.search),
+                                    ),
+                                    onChanged: _searchUsers,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: _loadAllUsers,
+                                  child: const Text('Load All'),
+                                ),
+                              ],
+                            ),
+
+                            // Selected Users
+                            if (_selectedUsers.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                'Selected Users (${_selectedUsers.length})',
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ListView.builder(
+                                  itemCount: _selectedUsers.length,
+                                  itemBuilder: (context, index) {
+                                    final user = _selectedUsers[index];
+                                    return ListTile(
+                                      dense: true,
+                                      title: Text(user['email'] ?? 'Unknown'),
+                                      subtitle: Text(user['role'] ?? 'user'),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.remove_circle),
+                                        onPressed: () {
+                                          setState(() {
+                                            _selectedUsers.removeAt(index);
+                                          });
+                                        },
+                                      ),
                                     );
                                   },
                                 ),
                               ),
                             ],
-                          ),
-                        ),
+
+                            // Search Results
+                            if (_searchResults.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              Container(
+                                height:
+                                    200, // Constrained height for search results
+                                child: Card(
+                                  child: Column(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              'Search Results (${_searchResults.length})',
+                                              style:
+                                                  Theme.of(
+                                                    context,
+                                                  ).textTheme.titleMedium,
+                                            ),
+                                            const Spacer(),
+                                            TextButton(
+                                              onPressed:
+                                                  _selectAllSearchResults,
+                                              child: const Text('Select All'),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: ListView.builder(
+                                          itemCount: _searchResults.length,
+                                          itemBuilder: (context, index) {
+                                            final user = _searchResults[index];
+                                            final isSelected = _selectedUsers
+                                                .any(
+                                                  (selected) =>
+                                                      selected['uid'] ==
+                                                      user['uid'],
+                                                );
+                                            return CheckboxListTile(
+                                              title: Text(
+                                                user['email'] ?? 'Unknown',
+                                              ),
+                                              subtitle: Text(
+                                                '${user['role'] ?? 'user'} • ${user['subscriptionType'] ?? 'free'}',
+                                              ),
+                                              value: isSelected,
+                                              onChanged: (checked) {
+                                                setState(() {
+                                                  if (checked == true) {
+                                                    if (!isSelected) {
+                                                      _selectedUsers.add(user);
+                                                    }
+                                                  } else {
+                                                    _selectedUsers.removeWhere(
+                                                      (selected) =>
+                                                          selected['uid'] ==
+                                                          user['uid'],
+                                                    );
+                                                  }
+                                                });
+                                              },
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ],
                       ),
-                    ],
-                  ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Send Button (always at bottom)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: ElevatedButton.icon(
+                      onPressed: _isSending ? null : _sendNotification,
+                      icon:
+                          _isSending
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Icon(Icons.send),
+                      label: Text(
+                        _isSending ? 'Sending...' : 'Send Notification',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-
-          const SizedBox(height: 16),
-
-          // Send Button
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: ElevatedButton.icon(
-              onPressed: _isSending ? null : _sendNotification,
-              icon:
-                  _isSending
-                      ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : const Icon(Icons.send),
-              label: Text(_isSending ? 'Sending...' : 'Send Notification'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-              ),
-            ),
-          ),
-
-          // Add some bottom padding to ensure no overflow
-          const SizedBox(height: 20),
-        ],
-      ),
+        );
+      },
     );
   }
 

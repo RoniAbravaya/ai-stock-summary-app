@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'services/firebase_service.dart';
 import 'services/mock_data_service.dart';
 import 'config/app_config.dart';
+import 'dart:async';
 
 // Top-level function to handle background messages
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -1815,267 +1816,134 @@ class _NotificationsTabState extends State<NotificationsTab> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(12), // Reduced from 16 to 12
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: constraints.maxHeight - 32, // Account for padding
-            ),
-            child: IntrinsicHeight(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Notification Content Section
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Notification Content',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _titleController,
-                            decoration: const InputDecoration(
-                              labelText: 'Notification Title',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.title),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _messageController,
-                            decoration: const InputDecoration(
-                              labelText: 'Notification Message',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.message),
-                            ),
-                            maxLines: 3,
-                          ),
-                        ],
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(8), // Reduced from 12
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Notification Content Section
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12), // Reduced from 16
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Notification Content',
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                    ),
+                      const SizedBox(height: 12), // Reduced from 16
+                      TextField(
+                        controller: _titleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Title',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        maxLength: 50,
+                      ),
+                      const SizedBox(height: 8), // Reduced
+                      TextField(
+                        controller: _messageController,
+                        decoration: const InputDecoration(
+                          labelText: 'Message',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        maxLines: 3,
+                        maxLength: 200,
+                      ),
+                    ],
                   ),
-
-                  const SizedBox(height: 16),
-
-                  // Audience Selection Section
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Target Audience',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            value: _selectedAudience,
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.group),
-                            ),
-                            items:
-                                _audienceOptions.entries
-                                    .map(
-                                      (entry) => DropdownMenuItem(
-                                        value: entry.key,
-                                        child: Text(entry.value),
-                                      ),
-                                    )
-                                    .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedAudience = value!;
-                                if (value != 'specific_users') {
-                                  _selectedUsers.clear();
-                                }
-                              });
-                            },
-                          ),
-
-                          // Specific Users Selection
-                          if (_selectedAudience == 'specific_users') ...[
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _searchController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Search Users',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.search),
-                                    ),
-                                    onChanged: _searchUsers,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                ElevatedButton(
-                                  onPressed: _loadAllUsers,
-                                  child: const Text('Load All'),
-                                ),
-                              ],
-                            ),
-
-                            // Selected Users
-                            if (_selectedUsers.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              Text(
-                                'Selected Users (${_selectedUsers.length})',
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                height: 120,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.grey.shade300,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: ListView.builder(
-                                  itemCount: _selectedUsers.length,
-                                  itemBuilder: (context, index) {
-                                    final user = _selectedUsers[index];
-                                    return ListTile(
-                                      dense: true,
-                                      title: Text(user['email'] ?? 'Unknown'),
-                                      subtitle: Text(user['role'] ?? 'user'),
-                                      trailing: IconButton(
-                                        icon: const Icon(Icons.remove_circle),
-                                        onPressed: () {
-                                          setState(() {
-                                            _selectedUsers.removeAt(index);
-                                          });
-                                        },
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-
-                            // Search Results
-                            if (_searchResults.isNotEmpty) ...[
-                              const SizedBox(height: 16),
-                              Container(
-                                height:
-                                    200, // Constrained height for search results
-                                child: Card(
-                                  child: Column(
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: Row(
-                                          children: [
-                                            Text(
-                                              'Search Results (${_searchResults.length})',
-                                              style:
-                                                  Theme.of(
-                                                    context,
-                                                  ).textTheme.titleMedium,
-                                            ),
-                                            const Spacer(),
-                                            TextButton(
-                                              onPressed:
-                                                  _selectAllSearchResults,
-                                              child: const Text('Select All'),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: ListView.builder(
-                                          itemCount: _searchResults.length,
-                                          itemBuilder: (context, index) {
-                                            final user = _searchResults[index];
-                                            final isSelected = _selectedUsers
-                                                .any(
-                                                  (selected) =>
-                                                      selected['uid'] ==
-                                                      user['uid'],
-                                                );
-                                            return CheckboxListTile(
-                                              title: Text(
-                                                user['email'] ?? 'Unknown',
-                                              ),
-                                              subtitle: Text(
-                                                '${user['role'] ?? 'user'} • ${user['subscriptionType'] ?? 'free'}',
-                                              ),
-                                              value: isSelected,
-                                              onChanged: (checked) {
-                                                setState(() {
-                                                  if (checked == true) {
-                                                    if (!isSelected) {
-                                                      _selectedUsers.add(user);
-                                                    }
-                                                  } else {
-                                                    _selectedUsers.removeWhere(
-                                                      (selected) =>
-                                                          selected['uid'] ==
-                                                          user['uid'],
-                                                    );
-                                                  }
-                                                });
-                                              },
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Send Button (always at bottom)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 12,
-                    ), // Reduced from 16
-                    child: ElevatedButton.icon(
-                      onPressed: _isSending ? null : _sendNotification,
-                      icon:
-                          _isSending
-                              ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                              : const Icon(Icons.send),
-                      label: Text(
-                        _isSending ? 'Sending...' : 'Send Notification',
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 48),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 8), // Reduced
+              // Audience Selection Section
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12), // Reduced
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Target Audience',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8), // Reduced
+                      DropdownButtonFormField<String>(
+                        value: _selectedAudience,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items:
+                            _audienceOptions.entries.map((entry) {
+                              return DropdownMenuItem(
+                                value: entry.key,
+                                child: Text(entry.value),
+                              );
+                            }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedAudience = value!;
+                            if (value != 'specific_users') {
+                              _selectedUsers.clear();
+                            }
+                          });
+                        },
+                      ),
+                      if (_selectedAudience == 'specific_users') ...[
+                        const SizedBox(height: 8),
+                        _buildUserSelection(),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8), // Reduced
+              // Send Button
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8), // Reduced
+                child: ElevatedButton.icon(
+                  onPressed: _isSending ? null : _sendNotification,
+                  icon:
+                      _isSending
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Icon(Icons.send),
+                  label: Text(_isSending ? 'Sending...' : 'Send Notification'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8), // Final padding at bottom
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
+  }
+
+  IconData _getAudienceIcon() {
+    switch (_selectedAudience) {
+      case 'free_users':
+        return Icons.people_outline;
+      case 'premium_users':
+        return Icons.workspace_premium;
+      case 'specific_users':
+        return Icons.person_pin;
+      default:
+        return Icons.public;
+    }
   }
 
   void _searchUsers(String query) async {
@@ -2230,6 +2098,140 @@ class _NotificationsTabState extends State<NotificationsTab> {
     _messageController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Widget _buildUserSelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Search bar
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  labelText: 'Search Users',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.search),
+                  isDense: true,
+                ),
+                onChanged: _searchUsers,
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: _loadAllUsers,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+              child: const Text('Load All'),
+            ),
+          ],
+        ),
+
+        // Selected Users
+        if (_selectedUsers.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Selected Users (${_selectedUsers.length})',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          Container(
+            height: 100,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ListView.builder(
+              itemCount: _selectedUsers.length,
+              itemBuilder: (context, index) {
+                final user = _selectedUsers[index];
+                return ListTile(
+                  dense: true,
+                  title: Text(user['email'] ?? 'Unknown'),
+                  subtitle: Text(user['role'] ?? 'user'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.remove_circle),
+                    onPressed: () {
+                      setState(() {
+                        _selectedUsers.removeAt(index);
+                      });
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+
+        // Search Results
+        if (_searchResults.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            height: 150,
+            child: Card(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Search Results (${_searchResults.length})',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: _selectAllSearchResults,
+                          child: const Text('Select All'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _searchResults.length,
+                      itemBuilder: (context, index) {
+                        final user = _searchResults[index];
+                        final isSelected = _selectedUsers.any(
+                          (selected) => selected['uid'] == user['uid'],
+                        );
+                        return CheckboxListTile(
+                          dense: true,
+                          title: Text(user['email'] ?? 'Unknown'),
+                          subtitle: Text(
+                            '${user['role'] ?? 'user'} • ${user['subscriptionType'] ?? 'free'}',
+                          ),
+                          value: isSelected,
+                          onChanged: (checked) {
+                            setState(() {
+                              if (checked == true) {
+                                if (!isSelected) {
+                                  _selectedUsers.add(user);
+                                }
+                              } else {
+                                _selectedUsers.removeWhere(
+                                  (selected) => selected['uid'] == user['uid'],
+                                );
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }
 
@@ -2427,10 +2429,17 @@ class _UserManagementTabState extends State<UserManagementTab> {
   Widget _buildUserTile(Map<String, dynamic> user) {
     final isAdmin = user['role'] == 'admin';
     final canPromote = !isAdmin && widget.firebaseEnabled;
+    final currentUserEmail = FirebaseService().auth.currentUser?.email;
     final canRevoke =
-        isAdmin &&
-        widget.firebaseEnabled &&
-        user['email'] != FirebaseService().auth.currentUser?.email;
+        isAdmin && widget.firebaseEnabled && user['email'] != currentUserEmail;
+
+    // Debug logging
+    print('🔍 UserTile Debug: ${user['email']}');
+    print('   - isAdmin: $isAdmin');
+    print('   - currentUserEmail: $currentUserEmail');
+    print('   - canPromote: $canPromote');
+    print('   - canRevoke: $canRevoke');
+    print('   - firebaseEnabled: ${widget.firebaseEnabled}');
 
     return ListTile(
       leading: CircleAvatar(
@@ -2447,8 +2456,7 @@ class _UserManagementTabState extends State<UserManagementTab> {
           Row(
             children: [
               Text('Role: ${user['role'] ?? 'user'}'),
-              if (user['email'] ==
-                  FirebaseService().auth.currentUser?.email) ...[
+              if (user['email'] == currentUserEmail) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -2475,40 +2483,62 @@ class _UserManagementTabState extends State<UserManagementTab> {
             'Subscription: ${user['subscriptionType'] ?? 'free'} • '
             'Summaries: ${user['summariesUsed'] ?? 0}/${user['summariesLimit'] ?? 10}',
           ),
+          // Debug info in UI
+          if (widget.firebaseEnabled) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Debug: canPromote=$canPromote, canRevoke=$canRevoke',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
         ],
       ),
-      trailing:
-          canPromote
-              ? ElevatedButton.icon(
-                onPressed: _isProcessing ? null : () => _promoteToAdmin(user),
-                icon: const Icon(Icons.admin_panel_settings, size: 16),
-                label: const Text('Promote'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
-              )
-              : canRevoke
-              ? ElevatedButton.icon(
-                onPressed: _isProcessing ? null : () => _revokeAdminRole(user),
-                icon: const Icon(Icons.person_remove, size: 16),
-                label: const Text('Revoke'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                ),
-              )
-              : isAdmin
-              ? Chip(
-                label: Text(
-                  user['email'] == FirebaseService().auth.currentUser?.email
-                      ? 'Admin (You)'
-                      : 'Admin',
-                ),
-                backgroundColor: Colors.red.shade100,
-                labelStyle: TextStyle(color: Colors.red.shade700),
-              )
-              : null,
+      trailing: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (canPromote)
+            ElevatedButton.icon(
+              onPressed: _isProcessing ? null : () => _promoteToAdmin(user),
+              icon: const Icon(Icons.admin_panel_settings, size: 16),
+              label: const Text('Promote'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(100, 32),
+              ),
+            )
+          else if (canRevoke)
+            ElevatedButton.icon(
+              onPressed: _isProcessing ? null : () => _revokeAdminRole(user),
+              icon: const Icon(Icons.person_remove, size: 16),
+              label: const Text('Revoke'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(100, 32),
+              ),
+            )
+          else if (isAdmin)
+            Chip(
+              label: Text(
+                user['email'] == currentUserEmail ? 'Admin (You)' : 'Admin',
+                style: const TextStyle(fontSize: 12),
+              ),
+              backgroundColor: Colors.red.shade100,
+              labelStyle: TextStyle(color: Colors.red.shade700),
+            )
+          else
+            Chip(
+              label: const Text('User', style: TextStyle(fontSize: 12)),
+              backgroundColor: Colors.grey.shade100,
+              labelStyle: TextStyle(color: Colors.grey.shade700),
+            ),
+        ],
+      ),
     );
   }
 
@@ -2712,13 +2742,70 @@ class StatisticsTab extends StatefulWidget {
 }
 
 class _StatisticsTabState extends State<StatisticsTab> {
-  Map<String, dynamic>? _stats;
+  Map<String, dynamic> _stats = {};
   bool _isLoading = true;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadStats();
+
+    // Set up periodic refresh only if Firebase is enabled
+    if (widget.firebaseEnabled) {
+      _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+        if (mounted) {
+          _loadStats();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadStats() async {
+    if (!mounted) return;
+
+    try {
+      if (widget.firebaseEnabled) {
+        final stats = await FirebaseService().getSystemStats();
+        if (mounted) {
+          setState(() {
+            _stats = stats;
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Mock stats for offline mode
+        if (mounted) {
+          setState(() {
+            _stats = {
+              'totalUsers': 0,
+              'freeUsers': 0,
+              'premiumUsers': 0,
+              'activeUsers': 0,
+              'totalSummaries': 0,
+              'dailyUsage': 0,
+              'monthlyUsage': 0,
+              'recentRegistrations': 0,
+              'errorRate': 0.0,
+            };
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error loading stats: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -2755,7 +2842,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
                             const SizedBox(height: 16),
                             _buildStatRow(
                               'System Status',
-                              _stats?['systemStatus'] ?? 'Unknown',
+                              _stats['systemStatus'] ?? 'Unknown',
                               _getSystemStatusColor(),
                             ),
                             _buildStatRow(
@@ -2793,7 +2880,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
                                 Expanded(
                                   child: _buildStatCard(
                                     'Total Users',
-                                    _stats?['totalUsers']?.toString() ?? '0',
+                                    _stats['totalUsers']?.toString() ?? '0',
                                     Icons.people_outline,
                                     Colors.blue,
                                   ),
@@ -2802,8 +2889,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
                                 Expanded(
                                   child: _buildStatCard(
                                     'Premium Users',
-                                    _stats?['activeSubscriptions']
-                                            ?.toString() ??
+                                    _stats['activeSubscriptions']?.toString() ??
                                         '0',
                                     Icons.star,
                                     Colors.orange,
@@ -2863,7 +2949,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
                             const SizedBox(height: 16),
                             _buildStatRow(
                               'Total Summaries Generated',
-                              _stats?['summariesGenerated']?.toString() ?? '0',
+                              _stats['summariesGenerated']?.toString() ?? '0',
                               Colors.green.shade700,
                             ),
                             _buildStatRow(
@@ -2996,31 +3082,31 @@ class _StatisticsTabState extends State<StatisticsTab> {
   }
 
   Color _getSystemStatusColor() {
-    final status = _stats?['systemStatus']?.toString().toLowerCase();
+    final status = _stats['systemStatus']?.toString().toLowerCase();
     if (status == 'online') return Colors.green;
     if (status == 'offline mode') return Colors.orange;
     return Colors.red;
   }
 
   int _getFreeUsersCount() {
-    final total = _stats?['totalUsers'] as int? ?? 0;
-    final premium = _stats?['activeSubscriptions'] as int? ?? 0;
+    final total = _stats['totalUsers'] as int? ?? 0;
+    final premium = _stats['activeSubscriptions'] as int? ?? 0;
     return (total - premium).clamp(0, total);
   }
 
   int _getActiveUsersCount() {
     // Simulated data - in real app, this would come from Firebase analytics
-    final total = _stats?['totalUsers'] as int? ?? 0;
+    final total = _stats['totalUsers'] as int? ?? 0;
     return (total * 0.3).round(); // Assume 30% of users are active today
   }
 
   int _getDailyAverage() {
-    final total = _stats?['summariesGenerated'] as int? ?? 0;
+    final total = _stats['summariesGenerated'] as int? ?? 0;
     return (total / 30).round(); // Rough 30-day average
   }
 
   int _getMonthlyAverage() {
-    final total = _stats?['summariesGenerated'] as int? ?? 0;
+    final total = _stats['summariesGenerated'] as int? ?? 0;
     return total; // Assume current number is monthly total
   }
 
@@ -3037,48 +3123,6 @@ class _StatisticsTabState extends State<StatisticsTab> {
   String _getPeakUsageHour() {
     // Simulated data - in real app, this would be calculated from usage analytics
     return widget.firebaseEnabled ? '14:00-15:00' : 'N/A';
-  }
-
-  Future<void> _loadStats() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      Map<String, dynamic> stats;
-      if (widget.firebaseEnabled) {
-        stats = await FirebaseService().getSystemStats();
-      } else {
-        // Demo data for offline mode
-        stats = {
-          'totalUsers': 1,
-          'activeSubscriptions': 0,
-          'summariesGenerated': 5,
-          'systemStatus': 'Demo Mode',
-        };
-      }
-
-      setState(() {
-        _stats = stats;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _stats = {
-          'totalUsers': 'Error',
-          'activeSubscriptions': 'Error',
-          'summariesGenerated': 'Error',
-          'systemStatus': 'Error',
-        };
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading statistics: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 }
 

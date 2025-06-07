@@ -9,6 +9,7 @@ import 'services/language_service.dart';
 import 'config/app_config.dart';
 import 'screens/language_settings_screen.dart';
 import 'screens/notification_settings_screen.dart';
+import 'screens/news_screen.dart';
 import 'dart:async';
 
 // Top-level function to handle background messages
@@ -1097,139 +1098,6 @@ class FavoritesScreen extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('AI Summary generation coming soon...')),
     );
-  }
-}
-
-// News Screen - Latest Financial News
-class NewsScreen extends StatelessWidget {
-  const NewsScreen({super.key, required this.firebaseEnabled});
-
-  final bool firebaseEnabled;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Financial News')),
-      body: firebaseEnabled ? _buildFirebaseContent() : _buildMockContent(),
-    );
-  }
-
-  Widget _buildFirebaseContent() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseService().getNews(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return _buildMockContent(); // Fallback to mock data
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildMockContent(); // Fallback to mock data
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (context, index) {
-            final newsDoc = snapshot.data!.docs[index];
-            final news = newsDoc.data() as Map<String, dynamic>;
-
-            return _buildNewsCard(news);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildMockContent() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: MockDataService().getNews(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError || !snapshot.hasData) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.article, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text('Unable to load news', style: TextStyle(fontSize: 18)),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.length,
-          itemBuilder: (context, index) {
-            final news = snapshot.data![index];
-            return _buildNewsCard(news);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildNewsCard(Map<String, dynamic> news) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              news['title'] ?? 'No title',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              news['description'] ?? 'No description available',
-              style: TextStyle(color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  news['source'] ?? 'Unknown source',
-                  style: TextStyle(
-                    color: Color(AppConfig.primaryBlue),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  _formatDate(news['publishedAt']),
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(dynamic timestamp) {
-    if (timestamp == null) return 'Unknown date';
-    try {
-      DateTime date;
-      if (timestamp is DateTime) {
-        date = timestamp;
-      } else {
-        date = timestamp.toDate();
-      }
-      return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
-      return 'Unknown date';
-    }
   }
 }
 

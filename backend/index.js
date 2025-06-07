@@ -12,6 +12,9 @@ const rateLimit = require('express-rate-limit');
 // Import services
 const firebaseService = require('./services/firebaseService');
 const mockData = require('./services/mockData');
+const yahooFinanceService = require('./services/yahooFinanceService');
+const newsCacheService = require('./services/newsCacheService');
+const schedulerService = require('./services/schedulerService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,7 +32,7 @@ app.use('/api/', limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:8080', 'capacitor://localhost', 'ionic://localhost', 'http://localhost', 'http://localhost:8100'],
+  origin: '*', // Allow all origins in development
   credentials: true
 }));
 
@@ -75,7 +78,12 @@ app.get('/health', (req, res) => {
     status: 'OK', 
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    firebase: firebaseService.isInitialized
+    services: {
+      firebase: firebaseService.isInitialized,
+      yahooFinance: yahooFinanceService.isConfigured(),
+      scheduler: schedulerService.getStatus().isRunning
+    },
+    supportedTickers: newsCacheService.getSupportedTickers().length
   });
 });
 
@@ -138,6 +146,85 @@ app.get('/api/news/stock/:stockId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching stock news:', error);
     res.status(500).json({ error: 'Failed to fetch stock news' });
+  }
+});
+
+// ==========================================
+// Yahoo Finance News API Routes
+// ==========================================
+
+// Get cached news for multiple tickers
+app.get('/api/yahoo-news', async (req, res) => {
+  try {
+    const { tickers } = req.query;
+    
+    if (!tickers) {
+      return res.status(400).json({ 
+        error: 'Missing required parameter: tickers',
+        example: '/api/yahoo-news?tickers=AAPL,GOOGL,TSLA or /api/yahoo-news?tickers=ALL'
+      });
+    }
+
+    let tickerArray;
+    const supportedTickers = newsCacheService.getSupportedTickers();
+
+    // Handle special case: tickers=ALL
+    if (tickers.trim().toUpperCase() === 'ALL') {
+      tickerArray = supportedTickers;
+      console.log(`📊 Fetching news for ALL tickers: ${tickerArray.length} tickers`);
+    } else {
+      // Parse tickers from comma-separated string
+      tickerArray = tickers.split(',').map(t => t.trim().toUpperCase());
+      
+      // Validate tickers
+      const invalidTickers = tickerArray.filter(t => !supportedTickers.includes(t));
+      
+      if (invalidTickers.length > 0) {
+        return res.status(400).json({
+          error: 'Invalid tickers provided',
+          invalidTickers: invalidTickers,
+          supportedTickers: supportedTickers
+        });
+      }
+    }
+
+    // Get cached news
+    const result = await newsCacheService.getNewsForTickers(tickerArray);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json({ error: result.error });
+    }
+  } catch (error) {
+    console.error('Error fetching Yahoo Finance news:', error);
+    res.status(500).json({ error: 'Failed to fetch news' });
+  }
+});
+
+// Get cache statistics
+app.get('/api/yahoo-news/stats', async (req, res) => {
+  try {
+    const stats = await newsCacheService.getCacheStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching cache stats:', error);
+    res.status(500).json({ error: 'Failed to fetch cache statistics' });
+  }
+});
+
+// Get supported tickers
+app.get('/api/yahoo-news/tickers', (req, res) => {
+  try {
+    const tickers = newsCacheService.getSupportedTickers();
+    res.json({ 
+      success: true, 
+      tickers: tickers,
+      total: tickers.length 
+    });
+  } catch (error) {
+    console.error('Error fetching supported tickers:', error);
+    res.status(500).json({ error: 'Failed to fetch supported tickers' });
   }
 });
 
@@ -342,6 +429,73 @@ app.post('/api/admin/send-notification', verifyFirebaseToken, requireAdmin, asyn
   }
 });
 
+// Manual refresh news for specific ticker
+app.post('/api/admin/refresh-news/:ticker', verifyFirebaseToken, requireAdmin, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+    
+    if (!ticker) {
+      return res.status(400).json({ error: 'Ticker parameter is required' });
+    }
+
+    console.log(`🔧 Admin triggered manual refresh for ticker: ${ticker}`);
+    
+    const result = await schedulerService.refreshTickerNews(ticker.toUpperCase());
+    
+    if (result.success) {
+      res.json({ 
+        success: true, 
+        message: `News refresh completed for ${ticker}`,
+        result: result
+      });
+    } else {
+      res.status(500).json({ 
+        error: result.error,
+        result: result 
+      });
+    }
+  } catch (error) {
+    console.error('Error in manual ticker refresh:', error);
+    res.status(500).json({ error: 'Failed to refresh ticker news' });
+  }
+});
+
+// Manual refresh news for all tickers
+app.post('/api/admin/refresh-news/all', verifyFirebaseToken, requireAdmin, async (req, res) => {
+  try {
+    console.log('🔧 Admin triggered manual refresh for all tickers');
+    
+    const result = await schedulerService.refreshAllTickersNews();
+    
+    if (result.success) {
+      res.json({ 
+        success: true, 
+        message: 'News refresh completed for all tickers',
+        result: result
+      });
+    } else {
+      res.status(500).json({ 
+        error: result.error || 'Refresh failed',
+        result: result 
+      });
+    }
+  } catch (error) {
+    console.error('Error in manual all tickers refresh:', error);
+    res.status(500).json({ error: 'Failed to refresh all ticker news' });
+  }
+});
+
+// Get scheduler status
+app.get('/api/admin/scheduler/status', verifyFirebaseToken, requireAdmin, (req, res) => {
+  try {
+    const status = schedulerService.getStatus();
+    res.json({ success: true, status: status });
+  } catch (error) {
+    console.error('Error fetching scheduler status:', error);
+    res.status(500).json({ error: 'Failed to fetch scheduler status' });
+  }
+});
+
 // ==========================================
 // Error Handling
 // ==========================================
@@ -364,11 +518,29 @@ app.use((error, req, res, next) => {
 // Server Startup
 // ==========================================
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 AI Stock Summary Backend running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔥 Firebase initialized: ${firebaseService.isInitialized}`);
   console.log(`🌍 Health check: http://localhost:${PORT}/health`);
+  
+  // Initialize scheduler service
+  try {
+    schedulerService.initialize();
+    console.log(`⏰ Scheduler service initialized`);
+  } catch (error) {
+    console.error('❌ Failed to initialize scheduler service:', error.message);
+  }
+  
+  // Test Yahoo Finance API connection (optional)
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const isConnected = await yahooFinanceService.testConnection();
+      console.log(`📡 Yahoo Finance API: ${isConnected ? '✅ Connected' : '❌ Failed'}`);
+    } catch (error) {
+      console.warn('⚠️ Yahoo Finance API test failed:', error.message);
+    }
+  }
 });
 
 // Graceful shutdown

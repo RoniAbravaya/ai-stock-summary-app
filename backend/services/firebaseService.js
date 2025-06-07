@@ -17,6 +17,13 @@ class FirebaseService {
     }
 
     try {
+      // Check if Firebase credentials are configured
+      if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+        console.warn('⚠️ Firebase credentials not configured. Skipping Firebase initialization.');
+        console.warn('📝 Please configure Firebase environment variables in .env file to enable Firebase features.');
+        return;
+      }
+
       // Initialize Firebase Admin with environment variables
       const serviceAccount = {
         type: 'service_account',
@@ -41,7 +48,7 @@ class FirebaseService {
       console.log('✅ Firebase Admin SDK initialized successfully');
     } catch (error) {
       console.error('❌ Failed to initialize Firebase Admin SDK:', error.message);
-      throw error;
+      console.warn('⚠️ Continuing without Firebase. Some features may not work.');
     }
   }
 

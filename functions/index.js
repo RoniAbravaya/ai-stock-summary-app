@@ -219,6 +219,7 @@ async function sendToTokens(messaging, tokens, notification) {
   let totalDelivered = 0;
   let totalFailed = 0;
   const invalidTokens = []; // Track invalid tokens for cleanup
+  const deliveredUsers = []; // Track successful deliveries for history
 
   for (let i = 0; i < tokens.length; i += batchSize) {
     const batch = tokens.slice(i, i + batchSize);
@@ -237,21 +238,14 @@ async function sendToTokens(messaging, tokens, notification) {
       totalDelivered += response.successCount;
       totalFailed += response.failureCount;
 
-      if (response.failureCount > 0) {
-        response.responses.forEach((resp, idx) => {
-          if (!resp.success) {
-            const token = batch[idx];
-            const error = resp.error;
-            
-            // Check if this is an invalid token error
-            if (error && error.code === 'messaging/registration-token-not-registered') {
-              logger.warn(`⚠️ Invalid token detected: ${token.substring(0, 20)}...`);
-              invalidTokens.push(token);
-            } else {
-              logger.warn(`⚠️ Failed to send to token ${idx}:`, resp.error);
-            }
-          }
-        });
+      // Process individual responses
+      if (response.responses) {
+        const batchResults = await processTokenBatchResults(
+          response.responses, 
+          batch, 
+          invalidTokens
+        );
+        deliveredUsers.push(...batchResults.deliveredUsers);
       }
 
       logger.info(`✅ Batch sent: ${response.successCount} success, ${response.failureCount} failed`);
@@ -261,12 +255,114 @@ async function sendToTokens(messaging, tokens, notification) {
     }
   }
 
+  // Store notification history for successfully delivered notifications
+  if (deliveredUsers.length > 0) {
+    await storeNotificationHistory(deliveredUsers, notification);
+  }
+
   // Clean up invalid tokens from database
   if (invalidTokens.length > 0) {
     await cleanupInvalidTokens(invalidTokens);
   }
 
   logger.info(`🎯 Total delivery: ${totalDelivered} delivered, ${totalFailed} failed`);
+}
+
+/**
+ * Process batch results and identify successful deliveries
+ */
+async function processTokenBatchResults(responses, tokens, invalidTokens) {
+  const deliveredUsers = [];
+  
+  // Get user mappings for tokens
+  const tokenToUserMap = await getTokenToUserMapping(tokens);
+  
+  responses.forEach((resp, idx) => {
+    const token = tokens[idx];
+    
+    if (resp.success) {
+      // Find user for this token
+      const userId = tokenToUserMap[token];
+      if (userId) {
+        deliveredUsers.push(userId);
+      }
+    } else {
+      const error = resp.error;
+      
+      // Check if this is an invalid token error
+      if (error && error.code === 'messaging/registration-token-not-registered') {
+        logger.warn(`⚠️ Invalid token detected: ${token.substring(0, 20)}...`);
+        invalidTokens.push(token);
+      } else {
+        logger.warn(`⚠️ Failed to send to token ${idx}:`, resp.error);
+      }
+    }
+  });
+  
+  return { deliveredUsers };
+}
+
+/**
+ * Create mapping from FCM tokens to user IDs
+ */
+async function getTokenToUserMapping(tokens) {
+  const tokenToUserMap = {};
+  
+  try {
+    const usersSnapshot = await admin
+        .firestore()
+        .collection("users")
+        .get();
+
+    usersSnapshot.forEach((doc) => {
+      const userData = doc.data();
+      if (userData.fcmToken && tokens.includes(userData.fcmToken)) {
+        tokenToUserMap[userData.fcmToken] = doc.id;
+      }
+    });
+  } catch (error) {
+    logger.error("❌ Error creating token to user mapping:", error);
+  }
+  
+  return tokenToUserMap;
+}
+
+/**
+ * Store notification history for delivered notifications
+ */
+async function storeNotificationHistory(userIds, notification) {
+  try {
+    logger.info(`📝 Storing notification history for ${userIds.length} users`);
+    
+    const batch = admin.firestore().batch();
+    const notificationType = notification.type || notification.target || 'admin_broadcast';
+    
+    userIds.forEach((userId) => {
+      const notificationRef = admin
+          .firestore()
+          .collection('user_notifications')
+          .doc(userId)
+          .collection('notifications')
+          .doc();
+      
+      batch.set(notificationRef, {
+        title: notification.title,
+        body: notification.message,
+        type: notificationType,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        isRead: false,
+        data: {
+          sentBy: notification.sentBy || 'admin',
+          originalNotificationId: notification.id || 'unknown'
+        }
+      });
+    });
+    
+    await batch.commit();
+    logger.info(`✅ Notification history stored for ${userIds.length} users`);
+  } catch (error) {
+    logger.error("❌ Error storing notification history:", error);
+  }
 }
 
 /**

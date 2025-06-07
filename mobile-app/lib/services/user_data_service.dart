@@ -57,9 +57,9 @@ class UserDataService {
                 .collection('users')
                 .doc(currentUser!.uid)
                 .set({
-                  'email': currentUser?.email,
-                  'displayName': currentUser?.displayName,
-                  'photoURL': currentUser?.photoURL,
+                  'email': currentUser.email,
+                  'displayName': currentUser.displayName,
+                  'photoURL': currentUser.photoURL,
                   'role': 'admin',
                   'summariesLimit': 1000,
                   'subscriptionType': 'admin',
@@ -67,7 +67,7 @@ class UserDataService {
                   'updatedAt': FieldValue.serverTimestamp(),
                 }, SetOptions(merge: true));
             print(
-              '✅ Admin permissions updated in Firebase for ${currentUser?.email ?? 'Unknown'}',
+              '✅ Admin permissions updated in Firebase for ${currentUser.email ?? 'Unknown'}',
             );
           } else {
             print(
@@ -322,7 +322,7 @@ class UserDataService {
         await _verifyAdminSetup().timeout(const Duration(seconds: 3));
 
         print(
-          '🎉 Admin setup complete for ${currentUser?.email ?? 'Unknown user'}',
+          '🎉 Admin setup complete for ${currentUser.email ?? 'Unknown user'}',
         );
       } else {
         print('ℹ️ Current user is not the designated admin user');

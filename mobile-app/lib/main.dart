@@ -5,10 +5,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'services/firebase_service.dart';
 import 'services/mock_data_service.dart';
+import 'services/language_service.dart';
 import 'config/app_config.dart';
+import 'screens/language_settings_screen.dart';
+import 'screens/notification_settings_screen.dart';
 import 'dart:async';
 
 // Top-level function to handle background messages
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp(
@@ -51,65 +55,112 @@ void main() async {
     firebaseInitialized = false;
   }
 
+  // Initialize Language Service
+  try {
+    await LanguageService().initialize();
+    print('✅ Language service initialized');
+  } catch (e) {
+    print('⚠️ Language service initialization failed: $e');
+  }
+
   runApp(AIStockSummaryApp(firebaseEnabled: firebaseInitialized));
 }
 
-class AIStockSummaryApp extends StatelessWidget {
+class AIStockSummaryApp extends StatefulWidget {
   const AIStockSummaryApp({super.key, required this.firebaseEnabled});
 
   final bool firebaseEnabled;
 
   @override
+  State<AIStockSummaryApp> createState() => _AIStockSummaryAppState();
+}
+
+class _AIStockSummaryAppState extends State<AIStockSummaryApp> {
+  final LanguageService _languageService = LanguageService();
+  late StreamController<String> _languageStreamController;
+
+  @override
+  void initState() {
+    super.initState();
+    _languageStreamController = StreamController<String>.broadcast();
+  }
+
+  @override
+  void dispose() {
+    _languageStreamController.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppConfig.appName,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Color(AppConfig.primaryBlue),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        fontFamily: AppTextStyles.fontFamily,
-        appBarTheme: AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-          backgroundColor: Color(AppConfig.primaryBlue),
-          foregroundColor: Colors.white,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(AppConfig.primaryBlue),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+    return StreamBuilder<String>(
+      stream: _languageStreamController.stream,
+      initialData: _languageService.currentLanguage,
+      builder: (context, snapshot) {
+        return MaterialApp(
+          title: _languageService.translate('app_name'),
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Color(AppConfig.primaryBlue),
+              brightness: Brightness.light,
+            ),
+            useMaterial3: true,
+            fontFamily: AppTextStyles.fontFamily,
+            appBarTheme: AppBarTheme(
+              centerTitle: true,
+              elevation: 0,
+              backgroundColor: Color(AppConfig.primaryBlue),
+              foregroundColor: Colors.white,
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(AppConfig.primaryBlue),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Color(AppConfig.primaryBlue),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-        fontFamily: AppTextStyles.fontFamily,
-      ),
-      debugShowCheckedModeBanner: AppConfig.isDevelopment,
-      home: AuthWrapper(firebaseEnabled: firebaseEnabled),
+          darkTheme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Color(AppConfig.primaryBlue),
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+            fontFamily: AppTextStyles.fontFamily,
+          ),
+          debugShowCheckedModeBanner: AppConfig.isDevelopment,
+          home: AuthWrapper(
+            firebaseEnabled: widget.firebaseEnabled,
+            onLanguageChanged: () {
+              _languageStreamController.add(_languageService.currentLanguage);
+            },
+          ),
+        );
+      },
     );
   }
 }
 
 class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key, required this.firebaseEnabled});
+  const AuthWrapper({
+    super.key,
+    required this.firebaseEnabled,
+    required this.onLanguageChanged,
+  });
 
   final bool firebaseEnabled;
+  final VoidCallback onLanguageChanged;
 
   @override
   Widget build(BuildContext context) {
     if (!firebaseEnabled) {
       // Show login screen without Firebase authentication
-      return LoginScreen(firebaseEnabled: firebaseEnabled);
+      return LoginScreen(
+        firebaseEnabled: firebaseEnabled,
+        onLanguageChanged: onLanguageChanged,
+      );
     }
 
     return StreamBuilder(
@@ -120,10 +171,16 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          return HomeScreen(firebaseEnabled: firebaseEnabled);
+          return HomeScreen(
+            firebaseEnabled: firebaseEnabled,
+            onLanguageChanged: onLanguageChanged,
+          );
         }
 
-        return LoginScreen(firebaseEnabled: firebaseEnabled);
+        return LoginScreen(
+          firebaseEnabled: firebaseEnabled,
+          onLanguageChanged: onLanguageChanged,
+        );
       },
     );
   }
@@ -134,6 +191,8 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final languageService = LanguageService();
+
     return Scaffold(
       backgroundColor: Color(AppConfig.primaryBlue),
       body: Center(
@@ -143,7 +202,7 @@ class SplashScreen extends StatelessWidget {
             Icon(Icons.trending_up, size: 80, color: Colors.white),
             const SizedBox(height: 20),
             Text(
-              AppConfig.appName,
+              languageService.translate('app_name'),
               style: TextStyle(
                 fontSize: AppTextStyles.headingLarge,
                 fontWeight: FontWeight.bold,
@@ -162,12 +221,17 @@ class SplashScreen extends StatelessWidget {
 }
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.firebaseEnabled});
+  const LoginScreen({
+    super.key,
+    required this.firebaseEnabled,
+    required this.onLanguageChanged,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 
   final bool firebaseEnabled;
+  final VoidCallback onLanguageChanged;
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -176,6 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _confirmPasswordController = TextEditingController();
   final _displayNameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _languageService = LanguageService();
   bool _isLoading = false;
   bool _isSignUpMode = false; // Toggle between sign-in and sign-up
 
@@ -200,7 +265,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  AppConfig.appName,
+                  _languageService.translate('app_name'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: AppTextStyles.headingLarge,
@@ -210,7 +275,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'AI-Powered Stock Summaries',
+                  _languageService.translate('app_tagline'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: AppTextStyles.bodyMedium,
@@ -221,7 +286,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // Mode indicator
                 Text(
-                  _isSignUpMode ? 'Create Account' : 'Welcome Back',
+                  _isSignUpMode
+                      ? _languageService.translate('auth_create_account')
+                      : _languageService.translate('auth_welcome_back'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: AppTextStyles.headingSmall,
@@ -268,8 +335,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 if (_isSignUpMode && widget.firebaseEnabled) ...[
                   TextFormField(
                     controller: _displayNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
+                    decoration: InputDecoration(
+                      labelText: _languageService.translate('auth_full_name'),
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person),
                     ),
@@ -287,8 +354,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
+                  decoration: InputDecoration(
+                    labelText: _languageService.translate('auth_email'),
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.email),
                   ),
@@ -310,8 +377,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
+                  decoration: InputDecoration(
+                    labelText: _languageService.translate('auth_password'),
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.lock),
                   ),
@@ -332,8 +399,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Confirm Password',
+                    decoration: InputDecoration(
+                      labelText: _languageService.translate(
+                        'auth_confirm_password',
+                      ),
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.lock_outline),
                     ),
@@ -364,8 +433,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _isLoading ? null : _toggleMode,
                     child: Text(
                       _isSignUpMode
-                          ? 'Already have an account? Sign In'
-                          : 'Don\'t have an account? Sign Up',
+                          ? _languageService.translate('auth_have_account')
+                          : _languageService.translate('auth_no_account'),
                       style: TextStyle(color: Color(AppConfig.primaryBlue)),
                     ),
                   ),
@@ -387,7 +456,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     OutlinedButton.icon(
                       onPressed: _isLoading ? null : _signInWithGoogle,
                       icon: const Icon(Icons.login),
-                      label: const Text('Sign in with Google'),
+                      label: Text(
+                        _languageService.translate('auth_sign_in_google'),
+                      ),
                     ),
                   ],
                 ],
@@ -403,7 +474,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!widget.firebaseEnabled) {
       return 'Continue (Demo)';
     }
-    return _isSignUpMode ? 'Create Account' : 'Sign In';
+    return _isSignUpMode
+        ? _languageService.translate('auth_sign_up')
+        : _languageService.translate('auth_sign_in');
   }
 
   void _toggleMode() {
@@ -447,7 +520,11 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (_) => HomeScreen(firebaseEnabled: false),
+              builder:
+                  (_) => HomeScreen(
+                    firebaseEnabled: false,
+                    onLanguageChanged: widget.onLanguageChanged,
+                  ),
             ),
           );
         }
@@ -487,7 +564,11 @@ class _LoginScreenState extends State<LoginScreen> {
           _showSuccessSnackBar('Demo account created!');
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (_) => HomeScreen(firebaseEnabled: false),
+              builder:
+                  (_) => HomeScreen(
+                    firebaseEnabled: false,
+                    onLanguageChanged: widget.onLanguageChanged,
+                  ),
             ),
           );
         }
@@ -556,9 +637,14 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.firebaseEnabled});
+  const HomeScreen({
+    super.key,
+    required this.firebaseEnabled,
+    required this.onLanguageChanged,
+  });
 
   final bool firebaseEnabled;
+  final VoidCallback onLanguageChanged;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -596,27 +682,39 @@ class _HomeScreenState extends State<HomeScreen> {
     DashboardScreen(firebaseEnabled: widget.firebaseEnabled),
     FavoritesScreen(firebaseEnabled: widget.firebaseEnabled),
     NewsScreen(firebaseEnabled: widget.firebaseEnabled),
-    ProfileScreen(firebaseEnabled: widget.firebaseEnabled),
+    ProfileScreen(
+      firebaseEnabled: widget.firebaseEnabled,
+      onLanguageChanged: widget.onLanguageChanged,
+    ),
     if (_isAdmin) AdminScreen(firebaseEnabled: widget.firebaseEnabled),
   ];
 
-  List<BottomNavigationBarItem> get _navItems => [
-    const BottomNavigationBarItem(
-      icon: Icon(Icons.dashboard),
-      label: 'Dashboard',
-    ),
-    const BottomNavigationBarItem(
-      icon: Icon(Icons.favorite),
-      label: 'Favorites',
-    ),
-    const BottomNavigationBarItem(icon: Icon(Icons.article), label: 'News'),
-    const BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-    if (_isAdmin)
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.admin_panel_settings),
-        label: 'Admin',
+  List<BottomNavigationBarItem> get _navItems {
+    final languageService = LanguageService();
+    return [
+      BottomNavigationBarItem(
+        icon: Icon(Icons.dashboard),
+        label: languageService.translate('nav_dashboard'),
       ),
-  ];
+      BottomNavigationBarItem(
+        icon: Icon(Icons.favorite),
+        label: languageService.translate('nav_favorites'),
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.article),
+        label: languageService.translate('nav_news'),
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.person),
+        label: languageService.translate('nav_profile'),
+      ),
+      if (_isAdmin)
+        BottomNavigationBarItem(
+          icon: Icon(Icons.admin_panel_settings),
+          label: languageService.translate('nav_admin'),
+        ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -642,6 +740,7 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final languageService = LanguageService();
     return Scaffold(
       appBar: AppBar(
         title: Text('${AppConfig.appName} - Dashboard'),
@@ -654,7 +753,11 @@ class DashboardScreen extends StatelessWidget {
               } else {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (_) => LoginScreen(firebaseEnabled: false),
+                    builder:
+                        (_) => LoginScreen(
+                          firebaseEnabled: false,
+                          onLanguageChanged: () {},
+                        ),
                   ),
                 );
               }
@@ -1131,16 +1234,29 @@ class NewsScreen extends StatelessWidget {
 }
 
 // Profile Screen - Usage Stats, Subscription Status, Settings
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key, required this.firebaseEnabled});
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({
+    super.key,
+    required this.firebaseEnabled,
+    required this.onLanguageChanged,
+  });
 
   final bool firebaseEnabled;
+  final VoidCallback onLanguageChanged;
 
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: firebaseEnabled ? _buildFirebaseContent() : _buildMockContent(),
+      appBar: AppBar(title: Text(LanguageService().translate('profile_title'))),
+      body:
+          widget.firebaseEnabled
+              ? _buildFirebaseContent()
+              : _buildMockContent(),
     );
   }
 
@@ -1263,7 +1379,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  email ?? 'No email',
+                  email ?? LanguageService().translate('profile_no_email'),
                   style: TextStyle(color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 8),
@@ -1280,7 +1396,9 @@ class ProfileScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
-                    userData['role'] == 'admin' ? 'Admin' : 'User',
+                    userData['role'] == 'admin'
+                        ? LanguageService().translate('profile_admin')
+                        : LanguageService().translate('profile_user'),
                     style: TextStyle(
                       color:
                           userData['role'] == 'admin'
@@ -1308,23 +1426,25 @@ class ProfileScreen extends StatelessWidget {
                   children: [
                     Icon(Icons.analytics, color: Color(AppConfig.primaryBlue)),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Usage Statistics',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        LanguageService().translate('profile_usage_stats'),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 _buildStatRow(
-                  'Subscription Type',
+                  LanguageService().translate('profile_subscription_type'),
                   _getSubscriptionDisplay(userData['subscriptionType']),
                 ),
                 const SizedBox(height: 8),
                 _buildStatRow(
-                  'AI Summaries Used',
+                  LanguageService().translate('profile_summaries_used'),
                   '${userData['summariesUsed'] ?? 0}/${userData['summariesLimit'] ?? 10}',
                 ),
                 const SizedBox(height: 12),
@@ -1333,7 +1453,7 @@ class ProfileScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Monthly Summary Usage',
+                      LanguageService().translate('profile_monthly_usage'),
                       style: TextStyle(
                         fontWeight: FontWeight.w500,
                         color: Colors.grey.shade700,
@@ -1384,29 +1504,29 @@ class ProfileScreen extends StatelessWidget {
                     children: [
                       Icon(Icons.star, color: Colors.orange),
                       const SizedBox(width: 8),
-                      const Text(
-                        'Upgrade to Premium',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          LanguageService().translate('premium_upgrade'),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Unlock unlimited AI summaries and premium features',
-                  ),
+                  Text(LanguageService().translate('premium_unlock')),
                   const SizedBox(height: 4),
                   Text(
-                    '• 100 AI summaries per month\n• Priority support\n• Advanced analytics\n• No ads',
+                    LanguageService().translate('premium_features'),
                     style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: () => _upgradeToPremium(context),
                     icon: const Icon(Icons.star),
-                    label: const Text('Upgrade Now - \$9.99/month'),
+                    label: Text(LanguageService().translate('premium_price')),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 48),
                       backgroundColor: Colors.orange,
@@ -1434,11 +1554,13 @@ class ProfileScreen extends StatelessWidget {
                       color: Color(AppConfig.primaryGreen),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Get More Summaries',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        LanguageService().translate('rewards_title'),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -1457,18 +1579,25 @@ class ProfileScreen extends StatelessWidget {
                       color: Color(AppConfig.primaryGreen),
                     ),
                   ),
-                  title: const Text(
-                    'Watch Rewarded Ad',
+                  title: Text(
+                    LanguageService().translate('rewards_watch_ad'),
                     style: TextStyle(fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  subtitle: const Text('Get +1 summary instantly'),
-                  trailing: ElevatedButton(
-                    onPressed: () => _watchRewardedAd(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(AppConfig.primaryGreen),
-                      foregroundColor: Colors.white,
+                  subtitle: Text(
+                    LanguageService().translate('rewards_get_summary'),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: ElevatedButton(
+                      onPressed: () => _watchRewardedAd(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(AppConfig.primaryGreen),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(LanguageService().translate('rewards_watch')),
                     ),
-                    child: const Text('Watch'),
                   ),
                 ),
               ],
@@ -1485,43 +1614,45 @@ class ProfileScreen extends StatelessWidget {
               _buildSettingsTile(
                 context: context,
                 icon: Icons.notifications,
-                title: 'Notifications',
-                subtitle: 'Manage push notifications',
+                title: LanguageService().translate('settings_notifications'),
+                subtitle: LanguageService().translate(
+                  'settings_notifications_desc',
+                ),
                 onTap: () => _openNotificationSettings(context),
               ),
               const Divider(height: 1),
               _buildSettingsTile(
                 context: context,
                 icon: Icons.language,
-                title: 'Language',
-                subtitle: 'Change app language',
+                title: LanguageService().translate('settings_language'),
+                subtitle: LanguageService().translate('settings_language_desc'),
                 onTap: () => _openLanguageSettings(context),
               ),
               const Divider(height: 1),
               _buildSettingsTile(
                 context: context,
                 icon: Icons.help_outline,
-                title: 'Help & Support',
-                subtitle: 'Get help and contact support',
+                title: LanguageService().translate('settings_help'),
+                subtitle: LanguageService().translate('settings_help_desc'),
                 onTap: () => _openHelpSupport(context),
               ),
               const Divider(height: 1),
               _buildSettingsTile(
                 context: context,
                 icon: Icons.privacy_tip_outlined,
-                title: 'Privacy Policy',
-                subtitle: 'View our privacy policy',
+                title: LanguageService().translate('settings_privacy'),
+                subtitle: LanguageService().translate('settings_privacy_desc'),
                 onTap: () => _openPrivacyPolicy(context),
               ),
               const Divider(height: 1),
               _buildSettingsTile(
                 context: context,
                 icon: Icons.logout,
-                title: 'Sign Out',
+                title: LanguageService().translate('auth_sign_out'),
                 subtitle:
-                    firebaseEnabled
-                        ? 'Sign out of your account'
-                        : 'Return to login',
+                    widget.firebaseEnabled
+                        ? LanguageService().translate('settings_sign_out_desc')
+                        : LanguageService().translate('settings_demo_sign_out'),
                 titleColor: Colors.red,
                 iconColor: Colors.red,
                 onTap: () => _signOut(context),
@@ -1537,7 +1668,14 @@ class ProfileScreen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade700)),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(color: Colors.grey.shade700),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
         Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
       ],
     );
@@ -1567,10 +1705,10 @@ class ProfileScreen extends StatelessWidget {
   String _getSubscriptionDisplay(String? subscriptionType) {
     switch (subscriptionType) {
       case 'premium':
-        return 'Premium';
+        return LanguageService().translate('profile_premium');
       case 'free':
       default:
-        return 'Free';
+        return LanguageService().translate('profile_free');
     }
   }
 
@@ -1583,9 +1721,13 @@ class ProfileScreen extends StatelessWidget {
 
   String _getUsageMessage(int used, int limit) {
     final remaining = limit - used;
-    if (remaining <= 0) return 'No summaries remaining this month';
-    if (remaining == 1) return '1 summary remaining this month';
-    return '$remaining summaries remaining this month';
+    if (remaining <= 0)
+      return LanguageService().translate('usage_no_remaining');
+    if (remaining == 1)
+      return LanguageService().translate('usage_remaining_singular');
+    return LanguageService().translateWithParams('usage_remaining', {
+      'count': remaining.toString(),
+    });
   }
 
   void _upgradeToPremium(BuildContext context) {
@@ -1593,36 +1735,38 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Upgrade to Premium'),
-            content: const Column(
+            title: Text(LanguageService().translate('premium_upgrade')),
+            content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Premium features include:'),
+                Text(LanguageService().translate('premium_features_include')),
                 SizedBox(height: 8),
-                Text('• 100 AI summaries per month'),
-                Text('• Priority support'),
-                Text('• Advanced analytics'),
-                Text('• Ad-free experience'),
+                Text(LanguageService().translate('premium_monthly_summaries')),
+                Text(LanguageService().translate('premium_priority_support')),
+                Text(LanguageService().translate('premium_advanced_analytics')),
+                Text(LanguageService().translate('premium_ad_free')),
                 SizedBox(height: 16),
-                Text('Price: \$9.99/month'),
+                Text(LanguageService().translate('premium_price_info')),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text(LanguageService().translate('cancel')),
               ),
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Premium subscription coming soon...'),
+                    SnackBar(
+                      content: Text(
+                        LanguageService().translate('premium_coming_soon'),
+                      ),
                     ),
                   );
                 },
-                child: const Text('Subscribe'),
+                child: Text(LanguageService().translate('premium_subscribe')),
               ),
             ],
           ),
@@ -1634,26 +1778,26 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Watch Rewarded Ad'),
-            content: const Text(
-              'Watch a short video ad to get +1 summary instantly.',
-            ),
+            title: Text(LanguageService().translate('rewards_watch_ad')),
+            content: Text(LanguageService().translate('rewards_watch_video')),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text(LanguageService().translate('cancel')),
               ),
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   // TODO: Implement rewarded ad functionality
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Rewarded ads coming soon...'),
+                    SnackBar(
+                      content: Text(
+                        LanguageService().translate('rewards_coming_soon'),
+                      ),
                     ),
                   );
                 },
-                child: const Text('Watch Ad'),
+                child: Text(LanguageService().translate('watch_ad')),
               ),
             ],
           ),
@@ -1661,26 +1805,40 @@ class ProfileScreen extends StatelessWidget {
   }
 
   void _openNotificationSettings(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Notification settings coming soon...')),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (context) => NotificationSettingsScreen(
+              firebaseEnabled: widget.firebaseEnabled,
+            ),
+      ),
     );
   }
 
-  void _openLanguageSettings(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Language settings coming soon...')),
+  void _openLanguageSettings(BuildContext context) async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const LanguageSettingsScreen()),
     );
+
+    // If language was changed, trigger the callback
+    if (result == true && widget.onLanguageChanged != null) {
+      widget.onLanguageChanged!();
+    }
   }
 
   void _openHelpSupport(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Help & Support coming soon...')),
+      SnackBar(
+        content: Text(LanguageService().translate('settings_help_coming')),
+      ),
     );
   }
 
   void _openPrivacyPolicy(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Privacy Policy coming soon...')),
+      SnackBar(
+        content: Text(LanguageService().translate('settings_privacy_coming')),
+      ),
     );
   }
 
@@ -1689,40 +1847,51 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Sign Out'),
+            title: Text(
+              LanguageService().translate('settings_sign_out_confirm'),
+            ),
             content: Text(
-              firebaseEnabled
-                  ? 'Are you sure you want to sign out of your account?'
-                  : 'Return to login screen?',
+              widget.firebaseEnabled
+                  ? LanguageService().translate('settings_sign_out_question')
+                  : LanguageService().translate('settings_return_login'),
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(LanguageService().translate('cancel')),
               ),
               ElevatedButton(
                 onPressed: () async {
                   Navigator.of(context).pop();
                   try {
-                    if (firebaseEnabled) {
+                    if (widget.firebaseEnabled) {
                       await FirebaseService().signOut();
                     } else {
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
-                          builder: (_) => LoginScreen(firebaseEnabled: false),
+                          builder:
+                              (_) => LoginScreen(
+                                firebaseEnabled: false,
+                                onLanguageChanged: () {},
+                              ),
                         ),
                       );
                     }
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Error signing out: ${e.toString()}'),
+                        content: Text(
+                          LanguageService().translateWithParams(
+                            'error_sign_out',
+                            {'error': e.toString()},
+                          ),
+                        ),
                       ),
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Sign Out'),
+                child: Text(LanguageService().translate('auth_sign_out')),
               ),
             ],
           ),

@@ -65,5 +65,16 @@ service cloud.firestore {
     match /fcmTokens/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // User notification history
+    match /user_notifications/{userId}/notifications/{notificationId} {
+      // Users can read their own notification history
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Users can update read status of their own notifications
+      allow update: if request.auth != null && request.auth.uid == userId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      // Cloud Functions can create notification history (no auth required for functions)
+      allow create: if true;
+    }
   }
 }

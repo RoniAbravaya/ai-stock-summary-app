@@ -148,6 +148,17 @@ class FirebaseService {
     // For now, just log the message
   }
 
+  /// Refresh FCM token for notification re-registration
+  Future<void> refreshFCMToken() async {
+    try {
+      await FirebaseMessaging.instance.deleteToken();
+      await _getFCMTokenSafely();
+      print('✅ FCM token refreshed successfully');
+    } catch (e) {
+      print('❌ Error refreshing FCM token: $e');
+    }
+  }
+
   /// Check if Firestore is available and responsive
   Future<void> _checkFirestoreConnection() async {
     try {
@@ -1092,6 +1103,34 @@ class FirebaseService {
     } catch (e) {
       print('❌ Error sending notification: $e');
       throw Exception('Failed to send notification: $e');
+    }
+  }
+
+  /// Add notification to user's notification history
+  Future<void> addNotificationToHistory({
+    required String userId,
+    required String title,
+    required String body,
+    required String type,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      await firestore
+          .collection('user_notifications')
+          .doc(userId)
+          .collection('notifications')
+          .add({
+            'title': title,
+            'body': body,
+            'type': type,
+            'timestamp': FieldValue.serverTimestamp(),
+            'isRead': false,
+            'data': data ?? {},
+          });
+
+      print('✅ Notification added to user history: $userId');
+    } catch (e) {
+      print('❌ Error adding notification to history: $e');
     }
   }
 

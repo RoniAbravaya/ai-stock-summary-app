@@ -1721,10 +1721,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   String _getUsageMessage(int used, int limit) {
     final remaining = limit - used;
-    if (remaining <= 0)
+    if (remaining <= 0) {
       return LanguageService().translate('usage_no_remaining');
-    if (remaining == 1)
+    }
+    if (remaining == 1) {
       return LanguageService().translate('usage_remaining_singular');
+    }
     return LanguageService().translateWithParams('usage_remaining', {
       'count': remaining.toString(),
     });
@@ -1821,8 +1823,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     // If language was changed, trigger the callback
-    if (result == true && widget.onLanguageChanged != null) {
-      widget.onLanguageChanged!();
+    if (result == true) {
+      widget.onLanguageChanged();
     }
   }
 

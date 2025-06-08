@@ -437,8 +437,9 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
   }
 
   String _formatTimestamp(Timestamp? timestamp) {
-    if (timestamp == null)
+    if (timestamp == null) {
       return LanguageService().translate('notif_time_unknown');
+    }
 
     final now = DateTime.now();
     final date = timestamp.toDate();

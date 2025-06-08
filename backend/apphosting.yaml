@@ -20,24 +20,61 @@ scripts:
 
 # Environment variables and secrets
 env:
-  # Node environment
+  # Server Configuration
   - variable: NODE_ENV
     value: "production"
     availability:
       - BUILD
       - RUNTIME
 
-  # RapidAPI Key (from secret)
+  - variable: LOG_LEVEL
+    value: "info"
+    availability:
+      - RUNTIME
+
+  # Feature Flags
+  - variable: ENABLE_SCHEDULER
+    value: "true"
+    availability:
+      - RUNTIME
+
+  - variable: ENABLE_CACHING
+    value: "true"
+    availability:
+      - RUNTIME
+
+  - variable: ENABLE_MOCK_DATA
+    value: "false"
+    availability:
+      - RUNTIME
+
+  # Cache Configuration
+  - variable: CACHE_TTL
+    value: "3600"
+    availability:
+      - RUNTIME
+
+  - variable: MAX_CACHE_ITEMS
+    value: "1000"
+    availability:
+      - RUNTIME
+
+  # Rate Limiting
+  - variable: RATE_LIMIT_WINDOW_MS
+    value: "900000"
+    availability:
+      - RUNTIME
+
+  - variable: RATE_LIMIT_MAX_REQUESTS
+    value: "100"
+    availability:
+      - RUNTIME
+
+  # Secrets
   - variable: RAPIDAPI_KEY
     secret: rapidapi-key
     availability:
       - BUILD
-      - RUNTIME
-
-  # Logging configuration
-  - variable: LOG_LEVEL
-    value: "info"
-    availability:
       - RUNTIME
 
 # Health check configuration

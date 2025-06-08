@@ -1,10 +1,20 @@
+/**
+ * Main Server Entry Point
+ */
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const dotenv = require('dotenv');
 const firebaseService = require('./services/firebaseService');
 const yahooFinanceService = require('./services/yahooFinanceService');
 const schedulerService = require('./services/schedulerService');
+
+// Load environment variables based on NODE_ENV
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 const app = express();
 
@@ -15,8 +25,8 @@ app.use(express.json());
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // default: 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100 // default: 100 requests per windowMs
 });
 app.use(limiter);
 
@@ -26,21 +36,26 @@ app.get('/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    environment: process.env.NODE_ENV,
     services: {
       firebase: firebaseService.isInitialized || false,
-      scheduler: schedulerService.isInitialized || false
+      scheduler: schedulerService.isInitialized || false,
+      yahooFinance: yahooFinanceService.isConfigured || false
+    },
+    config: {
+      enableScheduler: process.env.ENABLE_SCHEDULER === 'true',
+      enableCaching: process.env.ENABLE_CACHING === 'true',
+      enableMockData: process.env.ENABLE_MOCK_DATA === 'true'
     }
   };
   res.json(health);
 });
 
-// ==========================================
 // Server Startup
-// ==========================================
-
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 console.log(`Starting server on port ${PORT}`);
 console.log(`Environment: ${process.env.NODE_ENV}`);
+console.log(`Log Level: ${process.env.LOG_LEVEL}`);
 
 const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 AI Stock Summary Backend running at http://0.0.0.0:${PORT}`);
@@ -48,23 +63,16 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🔥 Firebase initialized: ${firebaseService.isInitialized}`);
   console.log(`🌍 Health check: http://0.0.0.0:${PORT}/health`);
   
-  // Initialize scheduler service
-  try {
-    await schedulerService.initialize();
-    console.log(`⏰ Scheduler service initialized`);
-  } catch (error) {
-    console.error('❌ Failed to initialize scheduler service:', error.message);
-    // Don't exit - continue running even if scheduler fails
-  }
-  
-  // Test Yahoo Finance API connection (optional)
-  if (process.env.NODE_ENV !== 'production') {
+  // Initialize scheduler service if enabled
+  if (process.env.ENABLE_SCHEDULER === 'true') {
     try {
-      const isConnected = await yahooFinanceService.testConnection();
-      console.log(`📡 Yahoo Finance API: ${isConnected ? '✅ Connected' : '❌ Failed'}`);
+      await schedulerService.initialize();
+      console.log(`⏰ Scheduler service initialized`);
     } catch (error) {
-      console.warn('⚠️ Yahoo Finance API test failed:', error.message);
+      console.error('❌ Failed to initialize scheduler service:', error.message);
     }
+  } else {
+    console.log('⏰ Scheduler service disabled');
   }
 }).on('error', (err) => {
   console.error('❌ Failed to start server:', err.message);

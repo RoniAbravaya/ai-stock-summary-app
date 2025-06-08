@@ -4,15 +4,31 @@
  */
 
 const admin = require('firebase-admin');
+const dotenv = require('dotenv');
+
+// Load environment variables from .env file in development
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 class FirebaseService {
   constructor() {
-    this.isInitialized = false;
+    this._isInitialized = false;
     this.init();
   }
 
+  /**
+   * Get initialization status
+   */
+  get isInitialized() {
+    return this._isInitialized;
+  }
+
+  /**
+   * Initialize Firebase Admin SDK
+   */
   init() {
-    if (this.isInitialized) {
+    if (this._isInitialized) {
       return;
     }
 
@@ -53,14 +69,44 @@ class FirebaseService {
         });
       }
 
-      this.isInitialized = true;
+      this._isInitialized = true;
       console.log('✅ Firebase Admin SDK initialized successfully');
     } catch (error) {
       console.error('❌ Failed to initialize Firebase Admin SDK:', error.message);
       console.error('Error details:', error);
       console.warn('⚠️ Continuing without Firebase. Some features may not work.');
+      this._isInitialized = false;
     }
   }
 
-  // ... rest of the class implementation stays the same ...
+  /**
+   * Get Firebase Admin instance
+   */
+  get admin() {
+    return admin;
+  }
+
+  /**
+   * Get Firestore instance
+   */
+  get firestore() {
+    return this._isInitialized ? admin.firestore() : null;
+  }
+
+  /**
+   * Get Storage instance
+   */
+  get storage() {
+    return this._isInitialized ? admin.storage() : null;
+  }
+
+  /**
+   * Get Auth instance
+   */
+  get auth() {
+    return this._isInitialized ? admin.auth() : null;
+  }
 }
+
+// Export singleton instance
+module.exports = new FirebaseService();

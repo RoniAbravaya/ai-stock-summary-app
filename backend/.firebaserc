@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "new-flutter-ai"
+  },
+  "targets": {
+    "new-flutter-ai": {
+      "apphosting": {
+        "backend11": [
+          "backend11"
+        ]
+      }
+    }
   }
 }

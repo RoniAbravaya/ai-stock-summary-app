@@ -32,6 +32,12 @@ env:
     availability:
       - RUNTIME
 
+  # RapidAPI Key (from secret)
+  - variable: RAPIDAPI_KEY
+    secret: rapidapi-key
+    availability:
+      - RUNTIME
+
   # Logging configuration
   - variable: LOG_LEVEL
     value: "info"

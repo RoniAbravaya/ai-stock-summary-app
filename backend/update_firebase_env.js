@@ -26,6 +26,13 @@ const FIREBASE_CONFIG = {
   STORAGE_BUCKET: 'new-flutter-ai.appspot.com'
 };
 
+/**
+ * Updates the local `.env` file with Firebase service account credentials from the FIREBASE_CONFIG object.
+ *
+ * If the FIREBASE_CONFIG object contains placeholder values, prompts the user to provide actual Firebase credentials and exits without modifying the file. Otherwise, replaces existing Firebase-related environment variables in the `.env` file with the provided credentials.
+ *
+ * @remark Only updates the `.env` file if all required Firebase credentials are present in FIREBASE_CONFIG.
+ */
 function updateEnvFile() {
   try {
     const envPath = path.join(__dirname, '.env');

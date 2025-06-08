@@ -3,11 +3,16 @@
   "version": "1.0.0",
   "description": "Backend API for AI Stock Summary mobile application",
   "main": "index.js",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "build": "npm install --production"
   },
   "keywords": [
     "nodejs",
@@ -42,7 +47,12 @@
     "supertest": "^6.3.3",
     "@types/jest": "^29.5.8"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  }
-} 
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RoniAbravaya/ai-stock-summary-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RoniAbravaya/ai-stock-summary-app/issues"
+  },
+  "homepage": "https://github.com/RoniAbravaya/ai-stock-summary-app#readme"
+}

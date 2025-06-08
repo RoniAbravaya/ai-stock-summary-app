@@ -17,10 +17,11 @@ const newsCacheService = require('./services/newsCacheService');
 const schedulerService = require('./services/schedulerService');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Security middleware
+// Middleware
+app.use(cors());
 app.use(helmet());
+app.use(express.json());
 
 // Rate limiting
 const limiter = rateLimit({
@@ -29,12 +30,6 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.'
 });
 app.use('/api/', limiter);
-
-// CORS configuration
-app.use(cors({
-  origin: '*', // Allow all origins in development
-  credentials: true
-}));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -73,18 +68,32 @@ const requireAdmin = (req, res, next) => {
 };
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    services: {
-      firebase: firebaseService.isInitialized,
-      yahooFinance: yahooFinanceService.isConfigured(),
-      scheduler: schedulerService.getStatus().isRunning
-    },
-    supportedTickers: newsCacheService.getSupportedTickers().length
-  });
+app.get('/health', async (req, res) => {
+  try {
+    // Check Firebase connection
+    const firebaseStatus = firebaseService.isInitialized;
+    
+    // Basic service health check
+    const health = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      services: {
+        firebase: firebaseStatus ? 'connected' : 'disconnected',
+        server: 'running'
+      }
+    };
+
+    // Return 200 if everything is OK, otherwise 503
+    const httpStatus = (firebaseStatus) ? 200 : 503;
+    res.status(httpStatus).json(health);
+  } catch (error) {
+    res.status(503).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
 });
 
 // ==========================================
@@ -518,11 +527,12 @@ app.use((error, req, res, next) => {
 // Server Startup
 // ==========================================
 
-app.listen(PORT, async () => {
-  console.log(`🚀 AI Stock Summary Backend running on port ${PORT}`);
+const PORT = process.env.PORT || 8080; // Default to 8080 for App Hosting
+const server = app.listen(PORT, '0.0.0.0', async () => { // Listen on all network interfaces
+  console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔥 Firebase initialized: ${firebaseService.isInitialized}`);
-  console.log(`🌍 Health check: http://localhost:${PORT}/health`);
+  console.log(`🌍 Health check: http://0.0.0.0:${PORT}/health`);
   
   // Initialize scheduler service
   try {
@@ -544,14 +554,22 @@ app.listen(PORT, async () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🔄 SIGTERM received, shutting down gracefully...');
-  process.exit(0);
-});
+const shutdown = () => {
+  console.log('🔄 Received shutdown signal, closing server...');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
 
-process.on('SIGINT', () => {
-  console.log('🔄 SIGINT received, shutting down gracefully...');
-  process.exit(0);
-});
+  // Force close after 10s
+  setTimeout(() => {
+    console.error('⚠️ Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+};
 
-module.exports = app; 
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+// Export for testing
+module.exports = { app, server }; 

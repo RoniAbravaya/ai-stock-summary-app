@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "new-flutter-ai"
+  },
+  "targets": {
+    "new-flutter-ai": {
+      "hosting": {
+        "backend": [
+          "ai-stock-summary-app-backend"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

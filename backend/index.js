@@ -39,8 +39,11 @@ app.get('/health', (req, res) => {
 // ==========================================
 
 const PORT = process.env.PORT || 8080;
+console.log(`Starting server on port ${PORT}`);
+console.log(`Environment: ${process.env.NODE_ENV}`);
+
 const server = app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`🚀 AI Stock Summary Backend running on port ${PORT}`);
+  console.log(`🚀 AI Stock Summary Backend running at http://0.0.0.0:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔥 Firebase initialized: ${firebaseService.isInitialized}`);
   console.log(`🌍 Health check: http://0.0.0.0:${PORT}/health`);
@@ -51,6 +54,7 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
     console.log(`⏰ Scheduler service initialized`);
   } catch (error) {
     console.error('❌ Failed to initialize scheduler service:', error.message);
+    // Don't exit - continue running even if scheduler fails
   }
   
   // Test Yahoo Finance API connection (optional)
@@ -62,6 +66,9 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
       console.warn('⚠️ Yahoo Finance API test failed:', error.message);
     }
   }
+}).on('error', (err) => {
+  console.error('❌ Failed to start server:', err.message);
+  process.exit(1);
 });
 
 // Graceful shutdown

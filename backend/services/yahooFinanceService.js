@@ -8,7 +8,10 @@ const axios = require('axios');
 class YahooFinanceService {
   constructor() {
     this.baseURL = 'https://yahoo-finance15.p.rapidapi.com';
-    this.apiKey = process.env.RAPIDAPI_KEY || '61d947b2ebmsh0343668bcb3ac30p14545fjsna2ac6e70fe46';
+    this.apiKey = process.env.RAPIDAPI_KEY;
+    if (!this.apiKey) {
+      throw new Error('RAPIDAPI_KEY environment variable is not set. Please configure it in your environment.');
+    }
     this.headers = {
       'x-rapidapi-host': 'yahoo-finance15.p.rapidapi.com',
       'x-rapidapi-key': this.apiKey

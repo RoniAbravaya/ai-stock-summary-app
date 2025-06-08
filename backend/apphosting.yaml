@@ -20,22 +20,18 @@ scripts:
 
 # Environment variables and secrets
 env:
-  # Port configuration (required)
-  - variable: PORT
-    value: "8080"
-    availability:
-      - RUNTIME
-
   # Node environment
   - variable: NODE_ENV
     value: "production"
     availability:
+      - BUILD
       - RUNTIME
 
   # RapidAPI Key (from secret)
   - variable: RAPIDAPI_KEY
     secret: rapidapi-key
     availability:
+      - BUILD
       - RUNTIME
 
   # Logging configuration

@@ -1,15 +1,25 @@
 # Settings for Backend (on Cloud Run).
 # See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+runtime: nodejs18
+entrypoint: node index.js
+
+# Instance configuration
 runConfig:
   minInstances: 0
-  maxInstances: 100
+  maxInstances: 1
   concurrency: 80
   cpu: 1
   memoryMiB: 512
+  timeoutSeconds: 300
 
-# Environment variables and secrets.
+# Build and run scripts
+scripts:
+  buildCommand: "npm install"
+  runCommand: "npm start"
+
+# Environment variables and secrets
 env:
-  # Port configuration
+  # Port configuration (required)
   - variable: PORT
     value: "8080"
     availability:
@@ -21,11 +31,26 @@ env:
     availability:
       - RUNTIME
 
-  # Firebase configuration is automatically injected by Firebase Hosting
-  # You don't need to manually set FIREBASE_CONFIG as it's provided automatically
-
-  # Optional: Configure logging
+  # Logging configuration
   - variable: LOG_LEVEL
     value: "info"
     availability:
       - RUNTIME
+
+# Health check configuration
+healthCheck:
+  initialDelaySeconds: 30
+  timeoutSeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+  path: "/health"
+
+# Output files configuration
+outputFiles:
+  serverApp:
+    include: ["dist", "node_modules", "index.js", "package.json"]
+
+# Grant access to secrets in Cloud Secret Manager.
+# See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
+# - variable: MY_SECRET
+#   secret: mySecretRef

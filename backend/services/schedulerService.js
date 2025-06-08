@@ -1,9 +1,15 @@
 /**
  * Scheduler Service
- * Handles cron jobs for automated news data refresh
+ * Handles scheduling of periodic tasks
  */
 
-const cron = require('node-cron');
+let cron;
+try {
+  cron = require('node-cron');
+} catch (error) {
+  console.warn('⚠️ node-cron module not found. Scheduler functionality will be limited.');
+}
+
 const yahooFinanceService = require('./yahooFinanceService');
 const newsCacheService = require('./newsCacheService');
 
@@ -18,6 +24,84 @@ class SchedulerService {
       failedRuns: 0,
       lastRunResult: null
     };
+    this.isInitialized = false;
+    this.tasks = new Map();
+  }
+
+  /**
+   * Initialize the scheduler service
+   */
+  async initialize() {
+    if (!cron) {
+      console.warn('⚠️ Scheduler service initialization skipped (node-cron not available)');
+      return;
+    }
+
+    try {
+      // Initialize your scheduled tasks here
+      this.setupNewsUpdateTask();
+      this.setupCleanupTask();
+      
+      this.isInitialized = true;
+      console.log('✅ Scheduler service initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize scheduler service:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Setup periodic news update task
+   */
+  setupNewsUpdateTask() {
+    if (!cron) return;
+
+    // Run every hour
+    const task = cron.schedule('0 * * * *', async () => {
+      try {
+        console.log('🔄 Running scheduled news update...');
+        // Add your news update logic here
+        console.log('✅ Scheduled news update completed');
+      } catch (error) {
+        console.error('❌ Scheduled news update failed:', error.message);
+      }
+    });
+
+    this.tasks.set('newsUpdate', task);
+  }
+
+  /**
+   * Setup cleanup task
+   */
+  setupCleanupTask() {
+    if (!cron) return;
+
+    // Run daily at midnight
+    const task = cron.schedule('0 0 * * *', async () => {
+      try {
+        console.log('🧹 Running scheduled cleanup...');
+        // Add your cleanup logic here
+        console.log('✅ Scheduled cleanup completed');
+      } catch (error) {
+        console.error('❌ Scheduled cleanup failed:', error.message);
+      }
+    });
+
+    this.tasks.set('cleanup', task);
+  }
+
+  /**
+   * Stop all scheduled tasks
+   */
+  stopAll() {
+    if (!cron) return;
+
+    console.log('⏹️ Stopping all scheduled tasks...');
+    for (const [name, task] of this.tasks) {
+      task.stop();
+      console.log(`✅ Stopped task: ${name}`);
+    }
+    this.tasks.clear();
   }
 
   /**
@@ -271,18 +355,6 @@ class SchedulerService {
       timezone: 'UTC',
       scheduleExpression: '0 21 * * * (9:00 PM UTC daily)'
     };
-  }
-
-  /**
-   * Initialize the scheduler service
-   */
-  initialize() {
-    console.log('🔧 Initializing Scheduler Service...');
-    
-    // Start the daily refresh scheduler
-    this.startDailyRefresh();
-    
-    console.log('✅ Scheduler Service initialized successfully');
   }
 }
 

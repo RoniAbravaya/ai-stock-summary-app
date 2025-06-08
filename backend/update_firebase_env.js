@@ -80,4 +80,8 @@ console.log('2. Uncomment the last line: updateEnvFile();');
 console.log('3. Run: node update_firebase_env.js');
 console.log('');
 
+<<<<<<< HEAD
 module.exports = { updateEnvFile }; 
+=======
+module.exports = { updateEnvFile };
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0

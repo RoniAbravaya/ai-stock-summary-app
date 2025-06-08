@@ -3,6 +3,7 @@
 runConfig:
   # Instance configuration
   minInstances: 0
+<<<<<<< HEAD
   maxInstances: 10
   concurrency: 80
   cpu: 1
@@ -16,6 +17,16 @@ runConfig:
 # Environment variables and secrets.
 env:
   # Port configuration (required)
+=======
+  maxInstances: 100
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+# Environment variables and secrets.
+env:
+  # Port configuration
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0
   - variable: PORT
     value: "8080"
     availability:
@@ -30,6 +41,7 @@ env:
   # Firebase configuration is automatically injected by Firebase Hosting
   # You don't need to manually set FIREBASE_CONFIG as it's provided automatically
 
+<<<<<<< HEAD
   # Logging configuration
   - variable: LOG_LEVEL
     value: "info"
@@ -52,3 +64,10 @@ securityConfig:
 # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
 # - variable: MY_SECRET
 #   secret: mySecretRef
+=======
+  # Optional: Configure logging
+  - variable: LOG_LEVEL
+    value: "info"
+    availability:
+      - RUNTIME
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0

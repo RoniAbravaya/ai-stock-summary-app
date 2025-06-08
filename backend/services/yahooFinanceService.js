@@ -159,4 +159,8 @@ class YahooFinanceService {
 }
 
 // Export singleton instance
+<<<<<<< HEAD
 module.exports = new YahooFinanceService(); 
+=======
+module.exports = new YahooFinanceService();
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0

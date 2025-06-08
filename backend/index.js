@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * AI Stock Summary Backend
  * Main entry point for the Express API server
@@ -522,17 +523,29 @@ app.use((error, req, res, next) => {
     message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
   });
 });
+=======
+// ... existing code ...
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0
 
 // ==========================================
 // Server Startup
 // ==========================================
 
+<<<<<<< HEAD
 const PORT = process.env.PORT || 8080; // Default to 8080 for App Hosting
 const server = app.listen(PORT, '0.0.0.0', async () => { // Listen on all network interfaces
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔥 Firebase initialized: ${firebaseService.isInitialized}`);
   console.log(`🌍 Health check: http://0.0.0.0:${PORT}/health`);
+=======
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, async () => {
+  console.log(`🚀 AI Stock Summary Backend running on port ${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔥 Firebase initialized: ${firebaseService.isInitialized}`);
+  console.log(`🌍 Health check: http://localhost:${PORT}/health`);
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0
   
   // Initialize scheduler service
   try {
@@ -571,5 +584,9 @@ const shutdown = () => {
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
+<<<<<<< HEAD
 // Export for testing
 module.exports = { app, server }; 
+=======
+module.exports = app;
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0

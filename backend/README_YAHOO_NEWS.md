@@ -285,4 +285,8 @@ curl -X POST "http://localhost:3000/api/admin/refresh-news/AAPL" \
 2. **Multiple Refresh Schedules**: Different refresh intervals for different tickers
 3. **Article Deduplication**: Remove duplicate articles across tickers
 4. **Content Analysis**: Extract sentiment, keywords, and topics
+<<<<<<< HEAD
 5. **Real-time Updates**: WebSocket support for real-time news updates 
+=======
+5. **Real-time Updates**: WebSocket support for real-time news updates
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0

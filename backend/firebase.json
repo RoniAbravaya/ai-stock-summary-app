@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "emulators": {
     "dataconnect": {
       "dataDir": "dataconnect/.dataconnect/pgliteData"
@@ -74,6 +75,9 @@
   ],
   "hosting": {
     "target": "backend",
+=======
+  "hosting": {
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0
     "source": ".",
     "ignore": [
       "firebase.json",
@@ -85,6 +89,7 @@
     "frameworksBackend": {
       "region": "asia-east1"
     }
+<<<<<<< HEAD
   },
   "storage": {
     "rules": "storage.rules"
@@ -102,3 +107,7 @@
     }
   }
 }
+=======
+  }
+}
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0

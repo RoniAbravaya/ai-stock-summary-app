@@ -48,6 +48,17 @@
         "firebase-debug.*.log",
         "functions"
       ]
+    },
+    {
+      "backendId": "ai-stock-summary-app",
+      "rootDir": "/",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "functions"
+      ]
     }
   ],
   "hosting": {

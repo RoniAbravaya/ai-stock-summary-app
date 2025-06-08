@@ -439,4 +439,8 @@ class NewsCacheService {
 }
 
 // Export singleton instance
+<<<<<<< HEAD
 module.exports = new NewsCacheService(); 
+=======
+module.exports = new NewsCacheService();
+>>>>>>> 9086ac07f16d0c3d26eadb9e7df4bec407f515e0

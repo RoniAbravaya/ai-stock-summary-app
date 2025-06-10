@@ -208,4 +208,45 @@ Thumbs.db
 
 # Dependency lock files (comment out if you want to commit them)
 # package-lock.json
-# yarn.lock 
+# yarn.lock
+
+# Firebase
+.firebase/
+firebase-debug.log
+.runtimeconfig.json
+
+# Secrets and API keys
+**/rapidapi-key.txt
+**/*.key
+**/*.pem
+**/*.env
+.env*
+!.env.example
+
+# Flutter/Dart
+**/build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+*.lock
+*.g.dart
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db 

@@ -28,6 +28,7 @@
   ],
   "apphosting": {
     "source": "backend",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -38,15 +39,7 @@
     ],
     "frameworksBackend": {
       "region": "us-central1"
-    }
-  },
-  "hosting": {
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
+    },
     "rewrites": [
       {
         "source": "**",

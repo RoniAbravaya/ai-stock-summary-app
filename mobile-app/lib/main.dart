@@ -10,6 +10,7 @@ import 'config/app_config.dart';
 import 'screens/language_settings_screen.dart';
 import 'screens/notification_settings_screen.dart';
 import 'screens/news_screen.dart';
+import 'screens/stocks_screen.dart';
 import 'dart:async';
 
 // Top-level function to handle background messages
@@ -426,10 +427,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Main action button
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleMainAction,
-                  child:
-                      _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(_getMainButtonText()),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Text(_getMainButtonText()),
                 ),
 
                 // Toggle between sign-in and sign-up
@@ -526,11 +526,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder:
-                  (_) => HomeScreen(
-                    firebaseEnabled: false,
-                    onLanguageChanged: widget.onLanguageChanged,
-                  ),
+              builder: (_) => HomeScreen(
+                firebaseEnabled: false,
+                onLanguageChanged: widget.onLanguageChanged,
+              ),
             ),
           );
         }
@@ -570,11 +569,10 @@ class _LoginScreenState extends State<LoginScreen> {
           _showSuccessSnackBar('Demo account created!');
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder:
-                  (_) => HomeScreen(
-                    firebaseEnabled: false,
-                    onLanguageChanged: widget.onLanguageChanged,
-                  ),
+              builder: (_) => HomeScreen(
+                firebaseEnabled: false,
+                onLanguageChanged: widget.onLanguageChanged,
+              ),
             ),
           );
         }
@@ -685,22 +683,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Widget> get _screens => [
-    DashboardScreen(firebaseEnabled: widget.firebaseEnabled),
-    FavoritesScreen(firebaseEnabled: widget.firebaseEnabled),
-    NewsScreen(firebaseEnabled: widget.firebaseEnabled),
-    ProfileScreen(
-      firebaseEnabled: widget.firebaseEnabled,
-      onLanguageChanged: widget.onLanguageChanged,
-    ),
-    if (_isAdmin) AdminScreen(firebaseEnabled: widget.firebaseEnabled),
-  ];
+        StocksScreen(firebaseEnabled: widget.firebaseEnabled),
+        FavoritesScreen(firebaseEnabled: widget.firebaseEnabled),
+        NewsScreen(firebaseEnabled: widget.firebaseEnabled),
+        ProfileScreen(
+          firebaseEnabled: widget.firebaseEnabled,
+          onLanguageChanged: widget.onLanguageChanged,
+        ),
+        if (_isAdmin) AdminScreen(firebaseEnabled: widget.firebaseEnabled),
+      ];
 
   List<BottomNavigationBarItem> get _navItems {
     final languageService = LanguageService();
     return [
       BottomNavigationBarItem(
-        icon: Icon(Icons.dashboard),
-        label: languageService.translate('nav_dashboard'),
+        icon: Icon(Icons.trending_up),
+        label: 'Stocks',
       ),
       BottomNavigationBarItem(
         icon: Icon(Icons.favorite),
@@ -759,11 +757,10 @@ class DashboardScreen extends StatelessWidget {
               } else {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder:
-                        (_) => LoginScreen(
-                          firebaseEnabled: false,
-                          onLanguageChanged: () {},
-                        ),
+                    builder: (_) => LoginScreen(
+                      firebaseEnabled: false,
+                      onLanguageChanged: () {},
+                    ),
                   ),
                 );
               }
@@ -1126,20 +1123,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(LanguageService().translate('profile_title'))),
-      body:
-          widget.firebaseEnabled
-              ? _buildFirebaseContent()
-              : _buildMockContent(),
+      body: widget.firebaseEnabled
+          ? _buildFirebaseContent()
+          : _buildMockContent(),
     );
   }
 
   Widget _buildFirebaseContent() {
     return StreamBuilder<DocumentSnapshot>(
-      stream:
-          FirebaseService().firestore
-              .collection('users')
-              .doc(FirebaseService().currentUser?.uid)
-              .snapshots(),
+      stream: FirebaseService()
+          .firestore
+          .collection('users')
+          .doc(FirebaseService().currentUser?.uid)
+          .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -1230,18 +1226,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   backgroundColor: Color(AppConfig.primaryBlue),
                   backgroundImage:
                       photoURL != null ? NetworkImage(photoURL) : null,
-                  child:
-                      photoURL == null
-                          ? Text(
-                            displayName?.substring(0, 1) ??
-                                email?.substring(0, 1) ??
-                                '?',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              color: Colors.white,
-                            ),
-                          )
-                          : null,
+                  child: photoURL == null
+                      ? Text(
+                          displayName?.substring(0, 1) ??
+                              email?.substring(0, 1) ??
+                              '?',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            color: Colors.white,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -1262,10 +1257,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color:
-                        userData['role'] == 'admin'
-                            ? Colors.red.shade100
-                            : Colors.blue.shade100,
+                    color: userData['role'] == 'admin'
+                        ? Colors.red.shade100
+                        : Colors.blue.shade100,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
@@ -1273,10 +1267,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? LanguageService().translate('profile_admin')
                         : LanguageService().translate('profile_user'),
                     style: TextStyle(
-                      color:
-                          userData['role'] == 'admin'
-                              ? Colors.red.shade700
-                              : Colors.blue.shade700,
+                      color: userData['role'] == 'admin'
+                          ? Colors.red.shade700
+                          : Colors.blue.shade700,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1334,8 +1327,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 4),
                     LinearProgressIndicator(
-                      value:
-                          (userData['summariesUsed'] ?? 0) /
+                      value: (userData['summariesUsed'] ?? 0) /
                           (userData['summariesLimit'] ?? 10),
                       backgroundColor: Colors.grey.shade300,
                       valueColor: AlwaysStoppedAnimation<Color>(
@@ -1522,10 +1514,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 context: context,
                 icon: Icons.logout,
                 title: LanguageService().translate('auth_sign_out'),
-                subtitle:
-                    widget.firebaseEnabled
-                        ? LanguageService().translate('settings_sign_out_desc')
-                        : LanguageService().translate('settings_demo_sign_out'),
+                subtitle: widget.firebaseEnabled
+                    ? LanguageService().translate('settings_sign_out_desc')
+                    : LanguageService().translate('settings_demo_sign_out'),
                 titleColor: Colors.red,
                 iconColor: Colors.red,
                 onTap: () => _signOut(context),
@@ -1608,84 +1599,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _upgradeToPremium(BuildContext context) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(LanguageService().translate('premium_upgrade')),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(LanguageService().translate('premium_features_include')),
-                SizedBox(height: 8),
-                Text(LanguageService().translate('premium_monthly_summaries')),
-                Text(LanguageService().translate('premium_priority_support')),
-                Text(LanguageService().translate('premium_advanced_analytics')),
-                Text(LanguageService().translate('premium_ad_free')),
-                SizedBox(height: 16),
-                Text(LanguageService().translate('premium_price_info')),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(LanguageService().translate('cancel')),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        LanguageService().translate('premium_coming_soon'),
-                      ),
-                    ),
-                  );
-                },
-                child: Text(LanguageService().translate('premium_subscribe')),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: Text(LanguageService().translate('premium_upgrade')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(LanguageService().translate('premium_features_include')),
+            SizedBox(height: 8),
+            Text(LanguageService().translate('premium_monthly_summaries')),
+            Text(LanguageService().translate('premium_priority_support')),
+            Text(LanguageService().translate('premium_advanced_analytics')),
+            Text(LanguageService().translate('premium_ad_free')),
+            SizedBox(height: 16),
+            Text(LanguageService().translate('premium_price_info')),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(LanguageService().translate('cancel')),
           ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    LanguageService().translate('premium_coming_soon'),
+                  ),
+                ),
+              );
+            },
+            child: Text(LanguageService().translate('premium_subscribe')),
+          ),
+        ],
+      ),
     );
   }
 
   void _watchRewardedAd(BuildContext context) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(LanguageService().translate('rewards_watch_ad')),
-            content: Text(LanguageService().translate('rewards_watch_video')),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(LanguageService().translate('cancel')),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  // TODO: Implement rewarded ad functionality
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        LanguageService().translate('rewards_coming_soon'),
-                      ),
-                    ),
-                  );
-                },
-                child: Text(LanguageService().translate('watch_ad')),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: Text(LanguageService().translate('rewards_watch_ad')),
+        content: Text(LanguageService().translate('rewards_watch_video')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(LanguageService().translate('cancel')),
           ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // TODO: Implement rewarded ad functionality
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    LanguageService().translate('rewards_coming_soon'),
+                  ),
+                ),
+              );
+            },
+            child: Text(LanguageService().translate('watch_ad')),
+          ),
+        ],
+      ),
     );
   }
 
   void _openNotificationSettings(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder:
-            (context) => NotificationSettingsScreen(
-              firebaseEnabled: widget.firebaseEnabled,
-            ),
+        builder: (context) => NotificationSettingsScreen(
+          firebaseEnabled: widget.firebaseEnabled,
+        ),
       ),
     );
   }
@@ -1720,56 +1708,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _signOut(BuildContext context) async {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(
-              LanguageService().translate('settings_sign_out_confirm'),
-            ),
-            content: Text(
-              widget.firebaseEnabled
-                  ? LanguageService().translate('settings_sign_out_question')
-                  : LanguageService().translate('settings_return_login'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(LanguageService().translate('cancel')),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.of(context).pop();
-                  try {
-                    if (widget.firebaseEnabled) {
-                      await FirebaseService().signOut();
-                    } else {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder:
-                              (_) => LoginScreen(
-                                firebaseEnabled: false,
-                                onLanguageChanged: () {},
-                              ),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          LanguageService().translateWithParams(
-                            'error_sign_out',
-                            {'error': e.toString()},
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: Text(LanguageService().translate('auth_sign_out')),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: Text(
+          LanguageService().translate('settings_sign_out_confirm'),
+        ),
+        content: Text(
+          widget.firebaseEnabled
+              ? LanguageService().translate('settings_sign_out_question')
+              : LanguageService().translate('settings_return_login'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(LanguageService().translate('cancel')),
           ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              try {
+                if (widget.firebaseEnabled) {
+                  await FirebaseService().signOut();
+                } else {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => LoginScreen(
+                        firebaseEnabled: false,
+                        onLanguageChanged: () {},
+                      ),
+                    ),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      LanguageService().translateWithParams(
+                        'error_sign_out',
+                        {'error': e.toString()},
+                      ),
+                    ),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text(LanguageService().translate('auth_sign_out')),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2116,68 +2102,61 @@ class _NotificationsTabState extends State<NotificationsTab> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        children:
-            _audienceOptions.entries.map((entry) {
-              final isSelected = _selectedAudience == entry.key;
-              return InkWell(
-                onTap: () {
-                  setState(() {
-                    _selectedAudience = entry.key;
-                    if (entry.key != 'specific_users') {
-                      _selectedUsers.clear();
-                    }
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color:
-                        isSelected ? Colors.blue.shade50 : Colors.transparent,
-                    border: Border(
-                      bottom:
-                          entry.key != _audienceOptions.keys.last
-                              ? BorderSide(color: Colors.grey.shade200)
-                              : BorderSide.none,
+        children: _audienceOptions.entries.map((entry) {
+          final isSelected = _selectedAudience == entry.key;
+          return InkWell(
+            onTap: () {
+              setState(() {
+                _selectedAudience = entry.key;
+                if (entry.key != 'specific_users') {
+                  _selectedUsers.clear();
+                }
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.blue.shade50 : Colors.transparent,
+                border: Border(
+                  bottom: entry.key != _audienceOptions.keys.last
+                      ? BorderSide(color: Colors.grey.shade200)
+                      : BorderSide.none,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _getAudienceIcon(entry.key),
+                    color: isSelected
+                        ? Colors.blue.shade600
+                        : Colors.grey.shade600,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      entry.value,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected
+                            ? Colors.blue.shade600
+                            : Colors.grey.shade700,
+                      ),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _getAudienceIcon(entry.key),
-                        color:
-                            isSelected
-                                ? Colors.blue.shade600
-                                : Colors.grey.shade600,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          entry.value,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight:
-                                isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                            color:
-                                isSelected
-                                    ? Colors.blue.shade600
-                                    : Colors.grey.shade700,
-                          ),
-                        ),
-                      ),
-                      if (isSelected)
-                        Icon(
-                          Icons.check_circle,
-                          color: Colors.blue.shade600,
-                          size: 20,
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
+                  if (isSelected)
+                    Icon(
+                      Icons.check_circle,
+                      color: Colors.blue.shade600,
+                      size: 20,
+                    ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -2188,10 +2167,9 @@ class _NotificationsTabState extends State<NotificationsTab> {
       height: 56,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors:
-              _isSending
-                  ? [Colors.grey.shade400, Colors.grey.shade500]
-                  : [Colors.green.shade500, Colors.green.shade600],
+          colors: _isSending
+              ? [Colors.grey.shade400, Colors.grey.shade500]
+              : [Colors.green.shade500, Colors.green.shade600],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -2959,10 +2937,9 @@ class _UserManagementTabState extends State<UserManagementTab> {
               Container(
                 height: 40,
                 decoration: BoxDecoration(
-                  color:
-                      _isLoading
-                          ? Colors.grey.shade400
-                          : Colors.purple.shade600,
+                  color: _isLoading
+                      ? Colors.grey.shade400
+                      : Colors.purple.shade600,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: ElevatedButton(
@@ -2975,23 +2952,22 @@ class _UserManagementTabState extends State<UserManagementTab> {
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                   ),
-                  child:
-                      _isLoading
-                          ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
                             ),
-                          )
-                          : const Icon(
-                            Icons.refresh,
-                            color: Colors.white,
-                            size: 16,
                           ),
+                        )
+                      : const Icon(
+                          Icons.refresh,
+                          color: Colors.white,
+                          size: 16,
+                        ),
                 ),
               ),
             ],
@@ -3127,16 +3103,15 @@ class _UserManagementTabState extends State<UserManagementTab> {
 
           // Users List
           Expanded(
-            child:
-                _isLoading
-                    ? _buildLoadingState()
-                    : ListView.builder(
-                      itemCount: _getDisplayedUsers().length,
-                      itemBuilder: (context, index) {
-                        final user = _getDisplayedUsers()[index];
-                        return _buildUserTile(user, index);
-                      },
-                    ),
+            child: _isLoading
+                ? _buildLoadingState()
+                : ListView.builder(
+                    itemCount: _getDisplayedUsers().length,
+                    itemBuilder: (context, index) {
+                      final user = _getDisplayedUsers()[index];
+                      return _buildUserTile(user, index);
+                    },
+                  ),
           ),
 
           // Pagination
@@ -3294,20 +3269,18 @@ class _UserManagementTabState extends State<UserManagementTab> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  isAdmin
-                                      ? Colors.red.shade50
-                                      : Colors.grey.shade100,
+                              color: isAdmin
+                                  ? Colors.red.shade50
+                                  : Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               user['role'] ?? 'user',
                               style: TextStyle(
                                 fontSize: 10,
-                                color:
-                                    isAdmin
-                                        ? Colors.red.shade700
-                                        : Colors.grey.shade700,
+                                color: isAdmin
+                                    ? Colors.red.shade700
+                                    : Colors.grey.shade700,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -3398,10 +3371,9 @@ class _UserManagementTabState extends State<UserManagementTab> {
                             isAdmin ? Colors.red.shade50 : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color:
-                              isAdmin
-                                  ? Colors.red.shade200
-                                  : Colors.grey.shade200,
+                          color: isAdmin
+                              ? Colors.red.shade200
+                              : Colors.grey.shade200,
                         ),
                       ),
                       child: Row(
@@ -3410,10 +3382,9 @@ class _UserManagementTabState extends State<UserManagementTab> {
                           Icon(
                             isAdmin ? Icons.admin_panel_settings : Icons.person,
                             size: 14,
-                            color:
-                                isAdmin
-                                    ? Colors.red.shade600
-                                    : Colors.grey.shade600,
+                            color: isAdmin
+                                ? Colors.red.shade600
+                                : Colors.grey.shade600,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -3421,10 +3392,9 @@ class _UserManagementTabState extends State<UserManagementTab> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
-                              color:
-                                  isAdmin
-                                      ? Colors.red.shade600
-                                      : Colors.grey.shade600,
+                              color: isAdmin
+                                  ? Colors.red.shade600
+                                  : Colors.grey.shade600,
                             ),
                           ),
                         ],
@@ -3466,58 +3436,56 @@ class _UserManagementTabState extends State<UserManagementTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder:
-          (context) => Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'User Actions',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: Icon(
-                    Icons.info_outline,
-                    color: Colors.blue.shade600,
-                  ),
-                  title: const Text('View Details'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showUserDetails(user);
-                  },
-                ),
-              ],
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'User Actions',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-          ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: Icon(
+                Icons.info_outline,
+                color: Colors.blue.shade600,
+              ),
+              title: const Text('View Details'),
+              onTap: () {
+                Navigator.pop(context);
+                _showUserDetails(user);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   void _showUserDetails(Map<String, dynamic> user) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('User Details'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Email: ${user['email'] ?? 'Unknown'}'),
-                Text('Role: ${user['role'] ?? 'user'}'),
-                Text('Subscription: ${user['subscriptionType'] ?? 'free'}'),
-                Text('Summaries Used: ${user['summariesUsed'] ?? 0}'),
-                Text('Summaries Limit: ${user['summariesLimit'] ?? 10}'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('User Details'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Email: ${user['email'] ?? 'Unknown'}'),
+            Text('Role: ${user['role'] ?? 'user'}'),
+            Text('Subscription: ${user['subscriptionType'] ?? 'free'}'),
+            Text('Summaries Used: ${user['summariesUsed'] ?? 0}'),
+            Text('Summaries Limit: ${user['summariesLimit'] ?? 10}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
           ),
+        ],
+      ),
     );
   }
 
@@ -3556,18 +3524,17 @@ class _UserManagementTabState extends State<UserManagementTab> {
 
   void _filterUsers(String query) {
     setState(() {
-      _filteredUsers =
-          query.trim().isEmpty
-              ? _users
-              : _users
-                  .where(
-                    (user) =>
-                        user['email']?.toLowerCase().contains(
+      _filteredUsers = query.trim().isEmpty
+          ? _users
+          : _users
+              .where(
+                (user) =>
+                    user['email']?.toLowerCase().contains(
                           query.toLowerCase(),
                         ) ??
-                        false,
-                  )
-                  .toList();
+                    false,
+              )
+              .toList();
       _currentPage = 0;
     });
   }
@@ -3617,24 +3584,23 @@ class _UserManagementTabState extends State<UserManagementTab> {
   Future<bool> _showConfirmDialog(String title, String content) async {
     return await showDialog<bool>(
           context: context,
-          builder:
-              (context) => AlertDialog(
-                title: Text(title),
-                content: Text(content),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                    ),
-                    child: const Text('Confirm'),
-                  ),
-                ],
+          builder: (context) => AlertDialog(
+            title: Text(title),
+            content: Text(content),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
               ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                ),
+                child: const Text('Confirm'),
+              ),
+            ],
+          ),
         ) ??
         false;
   }
@@ -3738,38 +3704,37 @@ class _StatisticsTabState extends State<StatisticsTab> {
       onRefresh: _loadStats,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child:
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                  children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'System Statistics',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 16),
-                            Text('Total Users: ${_stats['totalUsers'] ?? 0}'),
-                            Text(
-                              'Premium Users: ${_stats['activeSubscriptions'] ?? 0}',
-                            ),
-                            Text(
-                              'Summaries Generated: ${_stats['summariesGenerated'] ?? 0}',
-                            ),
-                            Text(
-                              'System Status: ${_stats['systemStatus'] ?? 'Unknown'}',
-                            ),
-                          ],
-                        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                children: [
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'System Statistics',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 16),
+                          Text('Total Users: ${_stats['totalUsers'] ?? 0}'),
+                          Text(
+                            'Premium Users: ${_stats['activeSubscriptions'] ?? 0}',
+                          ),
+                          Text(
+                            'Summaries Generated: ${_stats['summariesGenerated'] ?? 0}',
+                          ),
+                          Text(
+                            'System Status: ${_stats['systemStatus'] ?? 'Unknown'}',
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
       ),
     );
   }

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../config/app_config.dart';
 
 class EnvironmentSwitcher extends StatefulWidget {
-  const EnvironmentSwitcher({super.key});
+  const EnvironmentSwitcher({super.key, this.onEnvironmentChanged});
+
+  final VoidCallback? onEnvironmentChanged;
 
   @override
   State<EnvironmentSwitcher> createState() => _EnvironmentSwitcherState();
@@ -20,13 +22,17 @@ class _EnvironmentSwitcherState extends State<EnvironmentSwitcher> {
       ),
       tooltip: 'Environment: ${AppConfig.environmentName}',
       onSelected: (environment) {
-        AppConfig.setEnvironment(environment);
+        setState(() {
+          AppConfig.setEnvironment(environment);
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Switched to ${AppConfig.environmentName}'),
             duration: const Duration(seconds: 2),
           ),
         );
+        // Trigger callback to refresh data
+        widget.onEnvironmentChanged?.call();
       },
       itemBuilder: (context) => [
         PopupMenuItem(

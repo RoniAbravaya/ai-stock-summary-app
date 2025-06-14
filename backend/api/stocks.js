@@ -7,50 +7,179 @@ const express = require('express');
 const router = express.Router();
 const yahooFinanceService = require('../services/yahooFinanceService');
 const newsCacheService = require('../services/newsCacheService');
+const stockCacheService = require('../services/stockCacheService');
 const mockData = require('../services/mockData');
 
-// GET /api/stocks - Get available stocks
-router.get('/', async (req, res) => {
+// GET /api/stocks/main - Get main 20 stocks with quotes and charts
+router.get('/main', async (req, res) => {
   try {
-    console.log('📈 GET /api/stocks - Fetching available stocks');
+    console.log('📊 GET /api/stocks/main - Fetching main 20 stocks with charts');
     
     // Check if mock data is enabled
     if (process.env.ENABLE_MOCK_DATA === 'true') {
-      console.log('🎭 Mock data enabled, returning mock stocks');
-      const mockStocks = mockData.getAllStocks();
+      console.log('🎭 Mock data enabled, returning mock main stocks');
+      const mockStocks = stockCacheService.getMainStocks().map(ticker => ({
+        symbol: ticker,
+        name: yahooFinanceService.getStockName(ticker),
+        logo: yahooFinanceService.getCompanyLogo(ticker),
+        quote: yahooFinanceService.getMockQuote(ticker),
+        chart: yahooFinanceService.getMockChartData(ticker, '1d', '1mo'),
+        lastUpdated: Date.now()
+      }));
+      
       return res.json({
         success: true,
         data: mockStocks,
+        totalStocks: mockStocks.length,
         source: 'mock',
         timestamp: new Date().toISOString()
       });
     }
     
-    // Get supported tickers from news cache service
-    const supportedTickers = newsCacheService.getSupportedTickers();
+    // Get main stocks data from cache service
+    const results = await stockCacheService.getMainStocksData();
+    const successfulResults = results.filter(result => result.success);
     
-    // Get basic stock data for supported tickers
-    const stocks = supportedTickers.map(ticker => ({
-      symbol: ticker,
-      name: getStockName(ticker),
-      type: 'stock',
-      supported: true
-    }));
-    
-    console.log(`✅ Successfully returned ${stocks.length} available stocks`);
+    console.log(`✅ Successfully returned ${successfulResults.length}/${results.length} main stocks`);
     res.json({
       success: true,
-      data: stocks,
-      totalStocks: stocks.length,
-      source: 'supported_tickers',
+      data: successfulResults.map(result => result.data),
+      totalStocks: successfulResults.length,
+      cached: successfulResults.filter(r => r.source === 'cache').length,
+      fresh: successfulResults.filter(r => r.source === 'api').length,
+      stale: successfulResults.filter(r => r.source === 'stale_cache').length,
+      source: 'stock_cache_service',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('❌ Error in GET /api/stocks:', error);
+    console.error('❌ Error in GET /api/stocks/main:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
       message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// GET /api/stocks/:ticker/chart - Get chart data for a specific stock
+router.get('/:ticker/chart', async (req, res) => {
+  try {
+    const ticker = req.params.ticker.toUpperCase();
+    const interval = req.query.interval || '1d';
+    const range = req.query.range || '1mo';
+    
+    console.log(`📈 GET /api/stocks/${ticker}/chart - Fetching chart data (${interval}, ${range})`);
+    
+    // Check if mock data is enabled
+    if (process.env.ENABLE_MOCK_DATA === 'true') {
+      console.log('🎭 Mock data enabled, returning mock chart data');
+      const mockChart = yahooFinanceService.getMockChartData(ticker, interval, range);
+      return res.json({
+        success: true,
+        data: mockChart,
+        ticker: ticker,
+        interval: interval,
+        range: range,
+        source: 'mock',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Get chart data from Yahoo Finance
+    const result = await yahooFinanceService.getChartData(ticker, interval, range);
+    
+    if (result.success) {
+      console.log(`✅ Successfully returned chart data for ${ticker}`);
+      res.json({
+        success: true,
+        data: result.data,
+        ticker: ticker,
+        interval: interval,
+        range: range,
+        source: 'yahoo_finance',
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      console.warn(`⚠️ Failed to get chart data for ${ticker}: ${result.error}`);
+      res.status(404).json({
+        success: false,
+        error: result.error,
+        ticker: ticker,
+        interval: interval,
+        range: range,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error(`❌ Error in GET /api/stocks/${req.params.ticker}/chart:`, error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message,
+      ticker: req.params.ticker,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// GET /api/stocks/search - Enhanced search stocks
+router.get('/search', async (req, res) => {
+  try {
+    const query = req.query.q;
+    console.log(`🔍 GET /api/stocks/search?q=${query} - Enhanced stock search`);
+    
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query parameter "q" is required',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Check if mock data is enabled
+    if (process.env.ENABLE_MOCK_DATA === 'true') {
+      console.log('🎭 Mock data enabled, using mock search');
+      const mockResults = yahooFinanceService.getMockSearchResults(query);
+      return res.json({
+        success: true,
+        data: mockResults,
+        query: query,
+        totalResults: mockResults.length,
+        source: 'mock',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Use stock cache service for search
+    const result = await stockCacheService.searchStocks(query);
+    
+    if (result.success) {
+      console.log(`✅ Found ${result.data.length} search results for "${query}"`);
+      res.json({
+        success: true,
+        data: result.data,
+        query: query,
+        totalResults: result.data.length,
+        source: 'yahoo_finance_search',
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      console.warn(`⚠️ Search failed for "${query}": ${result.error}`);
+      res.status(500).json({
+        success: false,
+        error: result.error,
+        query: query,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error(`❌ Error in GET /api/stocks/search:`, error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message,
+      query: req.query.q,
       timestamp: new Date().toISOString()
     });
   }
@@ -73,15 +202,16 @@ router.get('/trending', async (req, res) => {
       });
     }
     
-    // Define trending stocks (can be made dynamic later)
-    const trendingTickers = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'JPM'];
+    // Use first 8 main stocks as trending
+    const mainStocks = stockCacheService.getMainStocks();
+    const trendingTickers = mainStocks.slice(0, 8);
     
-    const trendingStocks = trendingTickers.map(ticker => ({
+    const trendingStocks = trendingTickers.map((ticker, index) => ({
       symbol: ticker,
-      name: getStockName(ticker),
+      name: yahooFinanceService.getStockName(ticker),
       type: 'stock',
       trending: true,
-      rank: trendingTickers.indexOf(ticker) + 1
+      rank: index + 1
     }));
     
     console.log(`✅ Successfully returned ${trendingStocks.length} trending stocks`);
@@ -89,7 +219,7 @@ router.get('/trending', async (req, res) => {
       success: true,
       data: trendingStocks,
       totalTrending: trendingStocks.length,
-      source: 'curated_list',
+      source: 'main_stocks_subset',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -103,135 +233,109 @@ router.get('/trending', async (req, res) => {
   }
 });
 
-// GET /api/stocks/search - Search stocks
-router.get('/search', async (req, res) => {
+// GET /api/stocks - Get available stocks
+router.get('/', async (req, res) => {
   try {
-    const query = req.query.q;
-    console.log(`📈 GET /api/stocks/search?q=${query} - Searching stocks`);
-    
-    if (!query) {
-      return res.status(400).json({
-        success: false,
-        error: 'Query parameter "q" is required',
-        timestamp: new Date().toISOString()
-      });
-    }
+    console.log('📈 GET /api/stocks - Fetching available stocks');
     
     // Check if mock data is enabled
     if (process.env.ENABLE_MOCK_DATA === 'true') {
-      console.log('🎭 Mock data enabled, searching mock stocks');
-      const mockStocks = mockData.getAllStocks().filter(stock => 
-        stock.symbol.toLowerCase().includes(query.toLowerCase()) ||
-        stock.name.toLowerCase().includes(query.toLowerCase())
-      );
+      console.log('🎭 Mock data enabled, returning mock stocks');
+      const mockStocks = mockData.getAllStocks();
       return res.json({
         success: true,
         data: mockStocks,
-        query: query,
         source: 'mock',
         timestamp: new Date().toISOString()
       });
     }
     
-    // Simple search in supported tickers
-    const supportedTickers = newsCacheService.getSupportedTickers();
-    const matchingStocks = supportedTickers
-      .filter(ticker => 
-        ticker.toLowerCase().includes(query.toLowerCase()) ||
-        getStockName(ticker).toLowerCase().includes(query.toLowerCase())
-      )
-      .map(ticker => ({
-        symbol: ticker,
-        name: getStockName(ticker),
-        type: 'stock',
-        matchType: ticker.toLowerCase().includes(query.toLowerCase()) ? 'symbol' : 'name'
-      }));
+    // Get main stocks list
+    const mainStocks = stockCacheService.getMainStocks();
+    const stocks = mainStocks.map(ticker => ({
+      symbol: ticker,
+      name: yahooFinanceService.getStockName(ticker),
+      type: 'stock',
+      supported: true,
+      isMainStock: true
+    }));
     
-    console.log(`✅ Found ${matchingStocks.length} stocks matching "${query}"`);
+    console.log(`✅ Successfully returned ${stocks.length} available stocks`);
     res.json({
       success: true,
-      data: matchingStocks,
-      query: query,
-      totalMatches: matchingStocks.length,
-      source: 'supported_tickers_search',
+      data: stocks,
+      totalStocks: stocks.length,
+      source: 'main_stocks_list',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error(`❌ Error in GET /api/stocks/search:`, error);
+    console.error('❌ Error in GET /api/stocks:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
       message: error.message,
-      query: req.query.q,
       timestamp: new Date().toISOString()
     });
   }
 });
 
-// GET /api/stocks/:id - Get specific stock details
-router.get('/:id', async (req, res) => {
+// GET /api/stocks/:ticker - Get complete stock data (quote + chart)
+// This MUST be last to avoid catching specific routes like /main, /search, /trending
+router.get('/:ticker', async (req, res) => {
   try {
-    const ticker = req.params.id.toUpperCase();
-    console.log(`📈 GET /api/stocks/${ticker} - Fetching stock details`);
+    const ticker = req.params.ticker.toUpperCase();
+    console.log(`📊 GET /api/stocks/${ticker} - Fetching complete stock data`);
     
     // Check if mock data is enabled
     if (process.env.ENABLE_MOCK_DATA === 'true') {
-      console.log('🎭 Mock data enabled, returning mock stock details');
-      const mockStock = mockData.getStockById(ticker);
-      if (mockStock) {
-        return res.json({
-          success: true,
-          data: mockStock,
-          ticker: ticker,
-          source: 'mock',
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        return res.status(404).json({
-          success: false,
-          error: `Stock ${ticker} not found in mock data`,
-          ticker: ticker,
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-    
-    // Check if ticker is supported
-    const supportedTickers = newsCacheService.getSupportedTickers();
-    if (!supportedTickers.includes(ticker)) {
-      return res.status(404).json({
-        success: false,
-        error: `Stock ${ticker} is not supported`,
+      console.log('🎭 Mock data enabled, returning mock stock data');
+      const mockStock = {
+        symbol: ticker,
+        name: yahooFinanceService.getStockName(ticker),
+        logo: yahooFinanceService.getCompanyLogo(ticker),
+        quote: yahooFinanceService.getMockQuote(ticker),
+        chart: yahooFinanceService.getMockChartData(ticker, '1d', '1mo'),
+        lastUpdated: Date.now()
+      };
+      
+      return res.json({
+        success: true,
+        data: mockStock,
         ticker: ticker,
-        supportedTickers: supportedTickers,
+        source: 'mock',
         timestamp: new Date().toISOString()
       });
     }
     
-    // Return basic stock information
-    const stockDetails = {
-      symbol: ticker,
-      name: getStockName(ticker),
-      type: 'stock',
-      supported: true,
-      hasNews: true
-    };
+    // Get stock data from cache service
+    const result = await stockCacheService.getStockData(ticker);
     
-    console.log(`✅ Successfully returned details for ${ticker}`);
-    res.json({
-      success: true,
-      data: stockDetails,
-      ticker: ticker,
-      source: 'basic_info',
-      timestamp: new Date().toISOString()
-    });
+    if (result.success) {
+      console.log(`✅ Successfully returned complete data for ${ticker}`);
+      res.json({
+        success: true,
+        data: result.data,
+        ticker: ticker,
+        source: result.source,
+        warning: result.warning,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      console.warn(`⚠️ Failed to get data for ${ticker}: ${result.error}`);
+      res.status(404).json({
+        success: false,
+        error: result.error,
+        ticker: ticker,
+        timestamp: new Date().toISOString()
+      });
+    }
   } catch (error) {
-    console.error(`❌ Error in GET /api/stocks/${req.params.id}:`, error);
+    console.error(`❌ Error in GET /api/stocks/${req.params.ticker}:`, error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
       message: error.message,
-      ticker: req.params.id,
+      ticker: req.params.ticker,
       timestamp: new Date().toISOString()
     });
   }
@@ -239,35 +343,7 @@ router.get('/:id', async (req, res) => {
 
 // Helper function to get stock names
 function getStockName(ticker) {
-  const stockNames = {
-    'AAPL': 'Apple Inc.',
-    'GOOGL': 'Alphabet Inc.',
-    'MSFT': 'Microsoft Corporation',
-    'TSLA': 'Tesla, Inc.',
-    'AMZN': 'Amazon.com, Inc.',
-    'NVDA': 'NVIDIA Corporation',
-    'META': 'Meta Platforms, Inc.',
-    'JPM': 'JPMorgan Chase & Co.',
-    'BAC': 'Bank of America Corporation',
-    'ABBV': 'AbbVie Inc.',
-    'NVO': 'Novo Nordisk A/S',
-    'KO': 'The Coca-Cola Company',
-    'PLTR': 'Palantir Technologies Inc.',
-    'SMFG': 'Sumitomo Mitsui Financial Group',
-    'ASML': 'ASML Holding N.V.',
-    'BABA': 'Alibaba Group Holding Limited',
-    'PM': 'Philip Morris International Inc.',
-    'TMUS': 'T-Mobile US, Inc.',
-    'UNH': 'UnitedHealth Group Incorporated',
-    'GE': 'General Electric Company',
-    'V': 'Visa Inc.',
-    'WMT': 'Walmart Inc.',
-    'JNJ': 'Johnson & Johnson',
-    'XOM': 'Exxon Mobil Corporation',
-    'PG': 'The Procter & Gamble Company'
-  };
-  
-  return stockNames[ticker] || `${ticker} Stock`;
+  return yahooFinanceService.getStockName(ticker);
 }
 
 module.exports = router; 

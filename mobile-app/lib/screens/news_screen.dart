@@ -107,7 +107,7 @@ class _NewsScreenState extends State<NewsScreen> {
                     const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
               ),
             ),
-          const EnvironmentSwitcher(),
+          EnvironmentSwitcher(onEnvironmentChanged: _loadNews),
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: _showDebugInfo,

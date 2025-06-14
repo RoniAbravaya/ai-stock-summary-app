@@ -12,6 +12,7 @@ try {
 
 const yahooFinanceService = require('./yahooFinanceService');
 const newsCacheService = require('./newsCacheService');
+const stockCacheService = require('./stockCacheService');
 
 class SchedulerService {
   constructor() {
@@ -19,6 +20,12 @@ class SchedulerService {
     this.lastRefreshTime = null;
     this.nextRefreshTime = null;
     this.refreshStats = {
+      totalRuns: 0,
+      successfulRuns: 0,
+      failedRuns: 0,
+      lastRunResult: null
+    };
+    this.stockRefreshStats = {
       totalRuns: 0,
       successfulRuns: 0,
       failedRuns: 0,
@@ -40,6 +47,7 @@ class SchedulerService {
     try {
       // Initialize your scheduled tasks here
       this.setupNewsUpdateTask();
+      this.setupStockUpdateTask();
       this.setupCleanupTask();
       
       this.isInitialized = true;
@@ -75,13 +83,37 @@ class SchedulerService {
   }
 
   /**
+   * Setup periodic stock update task - runs every 24 hours
+   */
+  setupStockUpdateTask() {
+    if (!cron) return;
+
+    // Run every 24 hours at 1 AM UTC (1 hour after news update)
+    const task = cron.schedule('0 1 * * *', async () => {
+      try {
+        console.log('📊 Running scheduled 24-hour stock update...');
+        const result = await this.refreshMainStocksCache();
+        console.log(`✅ Scheduled stock update completed: ${result.summary || 'Success'}`);
+      } catch (error) {
+        console.error('❌ Scheduled stock update failed:', error.message);
+      }
+    }, {
+      scheduled: true,
+      timezone: 'UTC'
+    });
+
+    this.tasks.set('stockUpdate', task);
+    console.log('✅ 24-hour stock update scheduler started (runs daily at 1 AM UTC)');
+  }
+
+  /**
    * Setup cleanup task
    */
   setupCleanupTask() {
     if (!cron) return;
 
-    // Run daily at midnight
-    const task = cron.schedule('0 0 * * *', async () => {
+    // Run daily at 2 AM UTC
+    const task = cron.schedule('0 2 * * *', async () => {
       try {
         console.log('🧹 Running scheduled cleanup...');
         // Add your cleanup logic here
@@ -92,67 +124,134 @@ class SchedulerService {
     });
 
     this.tasks.set('cleanup', task);
+    console.log('✅ Cleanup scheduler started (runs daily at 2 AM UTC)');
   }
 
   /**
-   * Stop all scheduled tasks
+   * Manually trigger stock cache refresh
+   * @returns {Promise<Object>} Refresh operation result
    */
-  stopAll() {
-    if (!cron) return;
-
-    console.log('⏹️ Stopping all scheduled tasks...');
-    for (const [name, task] of this.tasks) {
-      task.stop();
-      console.log(`✅ Stopped task: ${name}`);
+  async refreshMainStocksCache() {
+    const startTime = new Date();
+    console.log(`📊 Starting stock cache refresh at ${startTime.toISOString()}`);
+    
+    try {
+      this.stockRefreshStats.totalRuns++;
+      
+      // Use the stock cache service to refresh
+      const result = await stockCacheService.refreshMainStocksCache();
+      
+      const endTime = new Date();
+      const refreshResult = {
+        ...result,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        summary: `Stock cache refresh: ${result.successCount}/${result.totalStocks} stocks updated`
+      };
+      
+      // Update stats
+      if (result.success) {
+        this.stockRefreshStats.successfulRuns++;
+      } else {
+        this.stockRefreshStats.failedRuns++;
+      }
+      
+      this.stockRefreshStats.lastRunResult = refreshResult;
+      
+      console.log(`✅ Stock cache refresh completed: ${refreshResult.summary}`);
+      return refreshResult;
+      
+    } catch (error) {
+      const endTime = new Date();
+      const duration = Math.round((endTime - startTime) / 1000);
+      
+      console.error('❌ Error during stock cache refresh:', error.message);
+      
+      this.stockRefreshStats.failedRuns++;
+      
+      const errorResult = {
+        success: false,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        durationSeconds: duration,
+        error: error.message,
+        summary: `Stock cache refresh failed after ${duration} seconds`
+      };
+      
+      this.stockRefreshStats.lastRunResult = errorResult;
+      
+      return errorResult;
     }
-    this.tasks.clear();
   }
 
   /**
-   * Start the daily news refresh scheduler
-   * Runs every 24 hours at midnight UTC (00:00)
+   * Manually trigger both news and stock cache refresh
+   * @returns {Promise<Object>} Combined refresh operation result
    */
-  startDailyRefresh() {
-    if (this.isSchedulerRunning) {
-      console.log('⚠️ Scheduler is already running');
-      return;
+  async refreshAllCaches() {
+    const startTime = new Date();
+    console.log(`🔄 Starting combined cache refresh at ${startTime.toISOString()}`);
+    
+    try {
+      // Run both refreshes in parallel
+      const [newsResult, stockResult] = await Promise.all([
+        this.refreshAllTickersNews(),
+        this.refreshMainStocksCache()
+      ]);
+      
+      const endTime = new Date();
+      const duration = Math.round((endTime - startTime) / 1000);
+      
+      const combinedResult = {
+        success: newsResult.success && stockResult.success,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        durationSeconds: duration,
+        news: newsResult,
+        stocks: stockResult,
+        summary: `Combined refresh: News ${newsResult.success ? 'success' : 'failed'}, Stocks ${stockResult.success ? 'success' : 'failed'}`
+      };
+      
+      console.log(`✅ Combined cache refresh completed: ${combinedResult.summary}`);
+      return combinedResult;
+      
+    } catch (error) {
+      const endTime = new Date();
+      const duration = Math.round((endTime - startTime) / 1000);
+      
+      console.error('❌ Error during combined cache refresh:', error.message);
+      
+      return {
+        success: false,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        durationSeconds: duration,
+        error: error.message,
+        summary: `Combined cache refresh failed after ${duration} seconds`
+      };
     }
+  }
 
-    // Schedule: Daily at midnight UTC (0 0 * * *)
-    this.cronJob = cron.schedule('0 0 * * *', async () => {
-      console.log('🕛 Daily news refresh triggered at midnight UTC');
-      await this.refreshAllTickersNews();
-    }, {
-      scheduled: false,
+  /**
+   * Get scheduler statistics
+   * @returns {Object} Scheduler statistics
+   */
+  getStats() {
+    return {
+      isInitialized: this.isInitialized,
+      tasksRunning: this.tasks.size,
+      tasks: Array.from(this.tasks.keys()),
+      news: {
+        ...this.refreshStats,
+        lastRefreshTime: this.lastRefreshTime,
+        nextRefreshTime: this.nextRefreshTime
+      },
+      stocks: {
+        ...this.stockRefreshStats
+      },
+      currentTime: new Date().toISOString(),
       timezone: 'UTC'
-    });
-
-    this.cronJob.start();
-    this.isSchedulerRunning = true;
-    this.calculateNextRefreshTime();
-    
-    console.log('✅ Daily news refresh scheduler started (midnight UTC daily)');
-    console.log(`📅 Next refresh scheduled for: ${this.nextRefreshTime}`);
-  }
-
-  /**
-   * Stop the daily news refresh scheduler
-   */
-  stopDailyRefresh() {
-    if (!this.isSchedulerRunning) {
-      console.log('⚠️ Scheduler is not running');
-      return;
-    }
-
-    if (this.cronJob) {
-      this.cronJob.stop();
-      this.cronJob.destroy();
-    }
-
-    this.isSchedulerRunning = false;
-    this.nextRefreshTime = null;
-    
-    console.log('🛑 Daily news refresh scheduler stopped');
+    };
   }
 
   /**

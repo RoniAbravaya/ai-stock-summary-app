@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
 const firebaseService = require('./services/firebaseService');
 const yahooFinanceService = require('./services/yahooFinanceService');
+const stockCacheService = require('./services/stockCacheService');
 const schedulerService = require('./services/schedulerService');
 
 // Load environment variables based on NODE_ENV
@@ -46,7 +47,8 @@ app.get('/health', (req, res) => {
     services: {
       firebase: firebaseService.isInitialized || false,
       scheduler: schedulerService.isInitialized || false,
-      yahooFinance: yahooFinanceService.isConfigured || false
+      yahooFinance: yahooFinanceService.isConfigured || false,
+      stockCache: stockCacheService.isInitialized || false
     },
     config: {
       enableScheduler: process.env.ENABLE_SCHEDULER === 'true',
@@ -68,6 +70,14 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔥 Firebase initialized: ${firebaseService.isInitialized}`);
   console.log(`🌍 Health check: http://0.0.0.0:${PORT}/health`);
+  
+  // Initialize stock cache service
+  try {
+    await stockCacheService.initialize();
+    console.log(`📊 Stock cache service initialized`);
+  } catch (error) {
+    console.error('❌ Failed to initialize stock cache service:', error.message);
+  }
   
   // Initialize scheduler service if enabled
   if (process.env.ENABLE_SCHEDULER === 'true') {

@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+ENV PORT=8080
+ENV FLASK_ENV=production
+
+EXPOSE 8080
+
+# Use gunicorn as the production server
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"] 

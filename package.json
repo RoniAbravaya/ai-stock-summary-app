@@ -1,0 +1,16 @@
+{
+  "name": "ai-stock-summary-backend",
+  "version": "1.0.0",
+  "description": "Backend API for AI Stock Summary mobile application",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "npm ci --production"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+} 

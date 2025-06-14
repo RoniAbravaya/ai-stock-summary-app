@@ -5,7 +5,6 @@
 
 const firebaseService = require('./firebaseService');
 const yahooFinanceService = require('./yahooFinanceService');
-const memoryCacheService = require('./memoryCacheService');
 
 class NewsCacheService {
   constructor() {
@@ -22,8 +21,8 @@ class NewsCacheService {
    * @returns {Object} Firebase Realtime Database reference
    */
   getTickerNewsRef(ticker) {
-    if (!firebaseService.isInitialized || !firebaseService.database) {
-      throw new Error('Firebase Realtime Database is not initialized. Please configure Firebase credentials.');
+    if (!firebaseService.isInitialized) {
+      throw new Error('Firebase is not initialized. Please configure Firebase credentials.');
     }
     return firebaseService.database.ref(`news_${ticker.toLowerCase()}`);
   }
@@ -40,8 +39,14 @@ class NewsCacheService {
       
       // Check if Firebase is initialized
       if (!firebaseService.isInitialized) {
-        console.warn(`⚠️ Firebase not initialized. Using memory cache for ${ticker}`);
-        return await memoryCacheService.storeNewsForTicker(ticker, newsData);
+        console.warn(`⚠️ Firebase not initialized. Simulating storage for ${ticker}`);
+        return {
+          success: true,
+          ticker: ticker,
+          articlesStored: newsData.length,
+          storedAt: new Date().toISOString(),
+          note: 'Firebase not configured - data not actually stored'
+        };
       }
       
       const tickerRef = this.getTickerNewsRef(ticker);
@@ -95,8 +100,54 @@ class NewsCacheService {
       
       // Check if Firebase is initialized
       if (!firebaseService.isInitialized) {
-        console.warn(`⚠️ Firebase not initialized. Using memory cache.`);
-        return await memoryCacheService.getNewsForTickers(tickers);
+        console.warn(`⚠️ Firebase not initialized. Falling back to Yahoo Finance API for all tickers...`);
+        const results = {};
+        
+        // Fetch fresh data for all tickers since no cache is available
+        for (const ticker of tickers) {
+          try {
+            console.log(`📡 Fetching fresh data for ${ticker} (no cache available)...`);
+            const freshDataResult = await yahooFinanceService.fetchNewsForTicker(ticker);
+            
+            if (freshDataResult.success && freshDataResult.data && freshDataResult.data.length > 0) {
+              console.log(`✅ Fetched ${freshDataResult.data.length} fresh articles for ${ticker}`);
+              results[ticker] = {
+                success: true,
+                ticker: ticker,
+                lastUpdated: new Date().toISOString(),
+                totalArticles: freshDataResult.data.length,
+                articles: freshDataResult.data,
+                cacheAge: 0,
+                freshlyFetched: true,
+                note: 'Data fetched directly from Yahoo Finance (no cache available)'
+              };
+            } else {
+              console.log(`❌ Failed to fetch fresh data for ${ticker}: ${freshDataResult.error || 'No data available'}`);
+              results[ticker] = {
+                success: false,
+                ticker: ticker,
+                error: 'No cached data available and failed to fetch fresh data',
+                details: freshDataResult.error || 'No data available from Yahoo Finance'
+              };
+            }
+          } catch (error) {
+            console.error(`❌ Error fetching fresh data for ${ticker}:`, error.message);
+            results[ticker] = {
+              success: false,
+              ticker: ticker,
+              error: 'No cached data available and error fetching fresh data',
+              details: error.message
+            };
+          }
+        }
+        
+        return {
+          success: Object.values(results).some(r => r.success),
+          results: results,
+          requestedTickers: tickers,
+          retrievedAt: new Date().toISOString(),
+          note: 'Firebase not configured - data fetched directly from Yahoo Finance'
+        };
       }
       
       const results = {};
@@ -118,13 +169,60 @@ class NewsCacheService {
             };
             console.log(`✅ Found ${data.totalArticles} cached articles for ${ticker}`);
           } else {
-            console.log(`⚠️ No cached data found for ${ticker}`);
-            results[ticker] = {
-              success: false,
-              ticker: ticker,
-              error: 'No cached data available',
-              note: 'Data will be available after the next scheduled refresh'
-            };
+            console.log(`⚠️ No cached data found for ${ticker}, fetching fresh data from Yahoo Finance...`);
+            
+            // Try to fetch fresh data from Yahoo Finance API
+            try {
+              const freshDataResult = await yahooFinanceService.fetchNewsForTicker(ticker);
+              
+              if (freshDataResult.success && freshDataResult.data && freshDataResult.data.length > 0) {
+                console.log(`📡 Fetched ${freshDataResult.data.length} fresh articles for ${ticker}`);
+                
+                // Store the fresh data in cache
+                const storeResult = await this.storeNewsForTicker(ticker, freshDataResult.data);
+                
+                if (storeResult.success) {
+                  console.log(`💾 Successfully cached fresh data for ${ticker}`);
+                  results[ticker] = {
+                    success: true,
+                    ticker: ticker,
+                    lastUpdated: new Date().toISOString(),
+                    totalArticles: freshDataResult.data.length,
+                    articles: freshDataResult.data,
+                    cacheAge: 0, // Fresh data
+                    freshlyFetched: true // Flag to indicate this was just fetched
+                  };
+                } else {
+                  console.log(`⚠️ Failed to cache fresh data for ${ticker}, but returning fresh data anyway`);
+                  results[ticker] = {
+                    success: true,
+                    ticker: ticker,
+                    lastUpdated: new Date().toISOString(),
+                    totalArticles: freshDataResult.data.length,
+                    articles: freshDataResult.data,
+                    cacheAge: 0,
+                    freshlyFetched: true,
+                    note: 'Fresh data not cached due to storage error'
+                  };
+                }
+              } else {
+                console.log(`❌ Failed to fetch fresh data for ${ticker}: ${freshDataResult.error || 'No data available'}`);
+                results[ticker] = {
+                  success: false,
+                  ticker: ticker,
+                  error: 'No cached data found and failed to fetch fresh data',
+                  details: freshDataResult.error || 'No data available from Yahoo Finance'
+                };
+              }
+            } catch (freshDataError) {
+              console.error(`❌ Error fetching fresh data for ${ticker}:`, freshDataError.message);
+              results[ticker] = {
+                success: false,
+                ticker: ticker,
+                error: 'No cached data found and error fetching fresh data',
+                details: freshDataError.message
+              };
+            }
           }
         } catch (error) {
           console.error(`❌ Error retrieving data for ${ticker}:`, error.message);
@@ -160,11 +258,6 @@ class NewsCacheService {
    */
   async checkCacheStatus(ticker, maxAgeHours = 24) {
     try {
-      // Use memory cache if Firebase is not initialized
-      if (!firebaseService.isInitialized) {
-        return await memoryCacheService.checkCacheStatus(ticker, maxAgeHours);
-      }
-      
       const tickerRef = this.getTickerNewsRef(ticker);
       const snapshot = await tickerRef.once('value');
       
@@ -267,11 +360,6 @@ class NewsCacheService {
   async getCacheStats() {
     try {
       console.log('📊 Generating cache statistics...');
-      
-      // Use memory cache if Firebase is not initialized
-      if (!firebaseService.isInitialized) {
-        return await memoryCacheService.getCacheStats();
-      }
       
       const stats = {
         totalTickers: this.tickers.length,

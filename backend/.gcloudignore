@@ -1,0 +1,34 @@
+# Ignore everything by default
+*
+
+# Include necessary files
+!index.js
+!package.json
+!package-lock.json
+!apphosting.yaml
+!services/**
+!utils/**
+!api/**
+
+# Ignore test files
+**/*.test.js
+**/*.spec.js
+test/
+jest.config.js
+
+# Ignore development files
+.env
+.env.*
+*.log
+.git/
+.gitignore
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore IDE files
+.idea/
+.vscode/
+*.swp
+*.swo 

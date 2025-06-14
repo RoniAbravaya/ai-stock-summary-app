@@ -37,6 +37,7 @@ dependencies:
   flutter_svg: ^2.0.9
   cached_network_image: ^3.3.0
   shimmer: ^3.0.0
+  pull_to_refresh: ^2.0.0
   
   # Firebase Core & Services
   firebase_core: ^2.25.4

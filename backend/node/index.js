@@ -10,11 +10,11 @@ const dotenv = require('dotenv');
 const firebaseService = require('./services/firebaseService');
 const yahooFinanceService = require('./services/yahooFinanceService');
 const schedulerService = require('./services/schedulerService');
+const newsCacheService = require('./services/newsCacheService');
+const mockData = require('./services/mockData');
 
 // Load environment variables based on NODE_ENV
 if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: './config.env' });
-} else {
   dotenv.config();
 }
 
@@ -32,9 +32,10 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// API Routes
-const apiRoutes = require('./api/routes');
-app.use('/api', apiRoutes);
+// Root endpoint for App Hosting health checks
+app.get('/', (req, res) => {
+  res.send('Hello from Firebase App Hosting backend!');
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -57,22 +58,47 @@ app.get('/health', (req, res) => {
   res.json(health);
 });
 
+// API Routes
+app.use('/api', require('./api/routes'));
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('❌ API Error:', error);
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error',
+    message: error.message,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Endpoint not found',
+    path: req.originalUrl,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Server Startup
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080; // Default to 8080 for App Hosting
 console.log(`Starting server on port ${PORT}`);
 console.log(`Environment: ${process.env.NODE_ENV}`);
 console.log(`Log Level: ${process.env.LOG_LEVEL}`);
 
-const server = app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`🚀 AI Stock Summary Backend running at http://0.0.0.0:${PORT}`);
+const server = app.listen(PORT, () => { // Remove '0.0.0.0' to let the platform decide
+  console.log(`🚀 AI Stock Summary Backend running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔥 Firebase initialized: ${firebaseService.isInitialized}`);
-  console.log(`🌍 Health check: http://0.0.0.0:${PORT}/health`);
+  console.log(`🌍 Health check: /health`);
+  console.log(`📡 API routes: /api/*`);
   
   // Initialize scheduler service if enabled
   if (process.env.ENABLE_SCHEDULER === 'true') {
     try {
-      await schedulerService.initialize();
+      schedulerService.initialize();
       console.log(`⏰ Scheduler service initialized`);
     } catch (error) {
       console.error('❌ Failed to initialize scheduler service:', error.message);

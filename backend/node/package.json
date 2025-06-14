@@ -8,8 +8,7 @@
     "build": "npm ci --production",
     "dev": "nodemon index.js",
     "test": "jest",
-    "test:watch": "jest --watch",
-    "populate-cache": "node scripts/populate-cache.js"
+    "test:watch": "jest --watch"
   },
   "keywords": [
     "nodejs",

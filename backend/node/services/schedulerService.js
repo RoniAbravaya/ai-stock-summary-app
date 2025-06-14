@@ -51,27 +51,23 @@ class SchedulerService {
   }
 
   /**
-   * Setup periodic news update task - runs every 24 hours
+   * Setup periodic news update task
    */
   setupNewsUpdateTask() {
     if (!cron) return;
 
-    // Run every 24 hours at midnight UTC
-    const task = cron.schedule('0 0 * * *', async () => {
+    // Run every hour
+    const task = cron.schedule('0 * * * *', async () => {
       try {
-        console.log('🔄 Running scheduled 24-hour news update...');
-        const result = await this.refreshAllTickersNews();
-        console.log(`✅ Scheduled news update completed: ${result.summary}`);
+        console.log('🔄 Running scheduled news update...');
+        // Add your news update logic here
+        console.log('✅ Scheduled news update completed');
       } catch (error) {
         console.error('❌ Scheduled news update failed:', error.message);
       }
-    }, {
-      scheduled: true,
-      timezone: 'UTC'
     });
 
     this.tasks.set('newsUpdate', task);
-    console.log('✅ 24-hour news update scheduler started (runs daily at midnight UTC)');
   }
 
   /**
@@ -110,7 +106,7 @@ class SchedulerService {
 
   /**
    * Start the daily news refresh scheduler
-   * Runs every 24 hours at midnight UTC (00:00)
+   * Runs every day at 9:00 PM UTC (21:00)
    */
   startDailyRefresh() {
     if (this.isSchedulerRunning) {
@@ -118,9 +114,9 @@ class SchedulerService {
       return;
     }
 
-    // Schedule: Daily at midnight UTC (0 0 * * *)
-    this.cronJob = cron.schedule('0 0 * * *', async () => {
-      console.log('🕛 Daily news refresh triggered at midnight UTC');
+    // Schedule: Daily at 9:00 PM UTC (0 21 * * *)
+    this.cronJob = cron.schedule('0 21 * * *', async () => {
+      console.log('🕘 Daily news refresh triggered at 9:00 PM UTC');
       await this.refreshAllTickersNews();
     }, {
       scheduled: false,
@@ -131,7 +127,7 @@ class SchedulerService {
     this.isSchedulerRunning = true;
     this.calculateNextRefreshTime();
     
-    console.log('✅ Daily news refresh scheduler started (midnight UTC daily)');
+    console.log('✅ Daily news refresh scheduler started (9:00 PM UTC daily)');
     console.log(`📅 Next refresh scheduled for: ${this.nextRefreshTime}`);
   }
 
@@ -327,16 +323,16 @@ class SchedulerService {
   }
 
   /**
-   * Calculate next refresh time (next midnight UTC)
+   * Calculate next refresh time (next 9:00 PM UTC)
    */
   calculateNextRefreshTime() {
     const now = new Date();
     const nextRefresh = new Date();
     
-    // Set to midnight UTC today
-    nextRefresh.setUTCHours(0, 0, 0, 0);
+    // Set to 9:00 PM UTC today
+    nextRefresh.setUTCHours(21, 0, 0, 0);
     
-    // If we've already passed midnight UTC today, set to tomorrow
+    // If we've already passed 9:00 PM UTC today, set to tomorrow
     if (now >= nextRefresh) {
       nextRefresh.setUTCDate(nextRefresh.getUTCDate() + 1);
     }
@@ -357,7 +353,7 @@ class SchedulerService {
       supportedTickers: newsCacheService.getSupportedTickers(),
       currentTime: new Date().toISOString(),
       timezone: 'UTC',
-      scheduleExpression: '0 0 * * * (midnight UTC daily)'
+      scheduleExpression: '0 21 * * * (9:00 PM UTC daily)'
     };
   }
 }

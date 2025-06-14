@@ -8,9 +8,22 @@ class AppConfig {
   static const String appVersion = '1.0.0';
   static const String appBuildNumber = '1';
 
-  // API Configuration
-  static const String baseUrl = 'http://localhost:3000/api';
-  static const String mockBaseUrl = 'http://localhost:3000/api/mock';
+  // Environment Configuration
+  static const AppEnvironment environment =
+      AppEnvironment.local; // Change this to switch environments
+
+  // API Configuration - Multiple environments
+  // Primary: Android emulator standard host access
+  static const String localBaseUrl = 'http://10.0.2.2:8080/api';
+  static const String localMockBaseUrl = 'http://10.0.2.2:8080/api/mock';
+
+  // Alternative: Direct IP access (fallback if 10.0.2.2 doesn't work)
+  static const String localIpBaseUrl = 'http://192.168.1.137:8080/api';
+  static const String localIpMockBaseUrl = 'http://192.168.1.137:8080/api/mock';
+  static const String hostedBaseUrl =
+      'https://ai-stock-summary-app--new-flutter-ai.us-central1.hosted.app/api';
+  static const String hostedMockBaseUrl =
+      'https://ai-stock-summary-app--new-flutter-ai.us-central1.hosted.app/api/mock';
 
   // Firebase Configuration (to be filled from Firebase console)
   static const String firebaseProjectId = '492701567937';
@@ -61,12 +74,34 @@ class AppConfig {
   static const List<String> supportedLanguages = ['en', 'es', 'fr', 'de', 'pt'];
 
   // Mock Data Configuration
-  static const bool enableMockData = true;
-  static const bool enableDebugMode = true;
+  static const bool enableMockData = false; // Disabled for production
+  static const bool enableDebugMode = false; // Disabled for production
 
   // Environment Detection
-  static bool get isProduction => const bool.fromEnvironment('dart.vm.product');
-  static bool get isDevelopment => !isProduction;
+  static bool get isProduction => environment == AppEnvironment.production;
+  static bool get isDevelopment => environment == AppEnvironment.development;
+  static bool get isLocal => environment == AppEnvironment.local;
+
+  // Network Configuration
+  static bool useAlternativeLocalIp = false;
+
+  /// Switch to alternative IP configuration for local development
+  static void switchToAlternativeIp() {
+    useAlternativeLocalIp = true;
+  }
+
+  /// Switch back to standard emulator IP configuration
+  static void switchToStandardIp() {
+    useAlternativeLocalIp = false;
+  }
+
+  /// Get current IP configuration info
+  static String get currentIpConfig {
+    if (environment != AppEnvironment.local) return 'N/A (not local)';
+    return useAlternativeLocalIp
+        ? 'Direct IP (192.168.1.137)'
+        : 'Emulator Standard (10.0.2.2)';
+  }
 
   // App Colors
   static const int primaryBlue = 0xFF2196F3;
@@ -78,17 +113,49 @@ class AppConfig {
   static const int cardBackground = 0xFFFFFFFF;
   static const int dividerColor = 0xFFE0E0E0;
 
-  // Get appropriate API base URL
+  // Get appropriate API base URL based on environment
   static String get apiBaseUrl {
-    if (enableMockData && isDevelopment) {
-      return mockBaseUrl;
+    switch (environment) {
+      case AppEnvironment.local:
+        if (enableMockData) {
+          return useAlternativeLocalIp ? localIpMockBaseUrl : localMockBaseUrl;
+        } else {
+          return useAlternativeLocalIp ? localIpBaseUrl : localBaseUrl;
+        }
+      case AppEnvironment.development:
+        return enableMockData ? hostedMockBaseUrl : hostedBaseUrl;
+      case AppEnvironment.production:
+        return hostedBaseUrl;
     }
-    return baseUrl;
+  }
+
+  // Get current environment info
+  static String get environmentName {
+    switch (environment) {
+      case AppEnvironment.local:
+        return 'Local Development';
+      case AppEnvironment.development:
+        return 'Hosted Development';
+      case AppEnvironment.production:
+        return 'Production';
+    }
+  }
+
+  // Get environment status indicator
+  static String get environmentIndicator {
+    switch (environment) {
+      case AppEnvironment.local:
+        return '🏠 LOCAL';
+      case AppEnvironment.development:
+        return '🔧 DEV';
+      case AppEnvironment.production:
+        return '🚀 LIVE';
+    }
   }
 
   // Get appropriate AdMob IDs
   static String getBannerAdUnitId() {
-    if (isDevelopment) {
+    if (isDevelopment || isLocal) {
       return testBannerAdUnitId;
     }
     // Return platform-specific ID based on Platform.isAndroid/Platform.isIOS
@@ -96,12 +163,19 @@ class AppConfig {
   }
 
   static String getRewardedAdUnitId() {
-    if (isDevelopment) {
+    if (isDevelopment || isLocal) {
       return testRewardedAdUnitId;
     }
     // Return platform-specific ID based on Platform.isAndroid/Platform.isIOS
     return admobRewardedUnitIdAndroid; // Placeholder - implement platform check
   }
+}
+
+// Environment enum for easy switching
+enum AppEnvironment {
+  local, // Local development server (localhost:3000)
+  development, // Hosted development environment
+  production, // Production hosted environment
 }
 
 // API Endpoints

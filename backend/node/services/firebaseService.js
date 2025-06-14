@@ -8,8 +8,6 @@ const dotenv = require('dotenv');
 
 // Load environment variables from .env file in development
 if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: './config.env' });
-} else {
   dotenv.config();
 }
 
@@ -107,13 +105,6 @@ class FirebaseService {
    */
   get auth() {
     return this._isInitialized ? admin.auth() : null;
-  }
-
-  /**
-   * Get Realtime Database instance
-   */
-  get database() {
-    return this._isInitialized ? admin.database() : null;
   }
 }
 

@@ -9,8 +9,9 @@ class AppConfig {
   static const String appBuildNumber = '1';
 
   // Environment Configuration
-  static const AppEnvironment environment =
-      AppEnvironment.local; // Change this to switch environments
+  static AppEnvironment _environment =
+      AppEnvironment.production; // Default to production
+  static AppEnvironment get environment => _environment;
 
   // API Configuration - Multiple environments
   // Primary: Android emulator standard host access
@@ -83,16 +84,22 @@ class AppConfig {
   static bool get isLocal => environment == AppEnvironment.local;
 
   // Network Configuration
-  static bool useAlternativeLocalIp = false;
+  static bool _useAlternativeLocalIp = false;
+  static bool get useAlternativeLocalIp => _useAlternativeLocalIp;
 
   /// Switch to alternative IP configuration for local development
   static void switchToAlternativeIp() {
-    useAlternativeLocalIp = true;
+    _useAlternativeLocalIp = true;
   }
 
   /// Switch back to standard emulator IP configuration
   static void switchToStandardIp() {
-    useAlternativeLocalIp = false;
+    _useAlternativeLocalIp = false;
+  }
+
+  /// Set the current environment
+  static void setEnvironment(AppEnvironment newEnvironment) {
+    _environment = newEnvironment;
   }
 
   /// Get current IP configuration info

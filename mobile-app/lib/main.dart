@@ -28,6 +28,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Set production environment by default
+  AppConfig.setEnvironment(AppEnvironment.production);
+  print('🌍 Environment set to: ${AppConfig.environmentName}');
+  print('🔗 API URL: ${AppConfig.apiBaseUrl}');
+
   bool firebaseInitialized = false;
 
   try {

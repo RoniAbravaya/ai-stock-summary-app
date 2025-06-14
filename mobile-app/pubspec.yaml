@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.2
+  sdk: '>=3.0.0 <4.0.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -32,7 +32,7 @@ dependencies:
     sdk: flutter
 
   # UI & Material Design
-  cupertino_icons: ^1.0.8
+  cupertino_icons: ^1.0.2
   google_fonts: ^6.1.0
   flutter_svg: ^2.0.9
   cached_network_image: ^3.3.0
@@ -40,10 +40,10 @@ dependencies:
   pull_to_refresh: ^2.0.0
   
   # Firebase Core & Services
-  firebase_core: ^2.25.4
-  firebase_auth: ^4.16.0
-  cloud_firestore: ^4.14.0
-  firebase_messaging: ^14.7.10
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.15.3
+  cloud_firestore: ^4.13.6
+  firebase_messaging: ^14.7.9
   firebase_analytics: ^10.8.0
   firebase_storage: ^11.6.0
   # firebase_crashlytics: ^3.4.9  # Disabled for development
@@ -53,7 +53,7 @@ dependencies:
   # flutter_facebook_auth: ^6.0.4  # Removed - causing SDK initialization issues
   
   # HTTP & API Communication
-  http: ^1.1.2
+  http: ^1.1.0
   dio: ^5.4.0
   
   # State Management & Storage
@@ -76,7 +76,7 @@ dependencies:
   syncfusion_flutter_charts: ^24.1.41
   
   # Utilities
-  intl: ^0.19.0
+  intl: ^0.18.1
   equatable: ^2.0.5
   json_annotation: ^4.8.1
   uuid: ^4.2.1
@@ -86,6 +86,7 @@ dependencies:
   # Image & Media
   image_picker: ^1.0.5
   permission_handler: ^11.1.0
+  provider: ^6.1.1
 
 dev_dependencies:
   flutter_test:
@@ -96,7 +97,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^2.0.0
   
   # Code Generation
   json_serializable: ^6.7.1

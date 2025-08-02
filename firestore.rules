@@ -55,8 +55,8 @@ service cloud.firestore {
     match /admin_notifications/{notificationId} {
       // Admins can create notifications
       allow create: if request.auth != null && request.auth.token.admin == true;
-      // Cloud Functions can read and update (no auth required for functions)
-      allow read, update: if true;
+      // Cloud Functions can read and update (verified by service account)
+      allow read, update: if request.auth != null && request.auth.token.firebase.sign_in_provider == 'custom';
       // Admins can read their own notifications
       allow read: if request.auth != null && request.auth.token.admin == true;
     }
@@ -73,8 +73,8 @@ service cloud.firestore {
       // Users can update read status of their own notifications
       allow update: if request.auth != null && request.auth.uid == userId &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-      // Cloud Functions can create notification history (no auth required for functions)
-      allow create: if true;
+      // Cloud Functions can create notification history (verified by service account)
+      allow create: if request.auth != null && request.auth.token.firebase.sign_in_provider == 'custom';
     }
   }
 }

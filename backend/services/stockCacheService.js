@@ -342,8 +342,18 @@ class StockCacheService {
    * @returns {boolean} True if cache is still valid
    */
   isCacheValid(lastUpdated) {
-    if (!lastUpdated) return false;
-    const age = Date.now() - lastUpdated;
+    if (!lastUpdated || typeof lastUpdated !== 'number') return false;
+    
+    const currentTime = Date.now();
+    const age = Math.abs(currentTime - lastUpdated);
+    
+    // Handle clock skew - if lastUpdated is in the future, consider it valid
+    // but log a warning for debugging
+    if (lastUpdated > currentTime) {
+      console.warn(`⚠️ Cache timestamp in future for data: ${new Date(lastUpdated).toISOString()}`);
+      return true;
+    }
+    
     return age < this.cacheExpiryMs;
   }
 

@@ -181,7 +181,7 @@ class YahooFinanceService {
    * Validate if API key is configured
    * @returns {boolean} True if API key is set
    */
-  isConfigured() {
+  getConfiguredStatus() {
     return this.isConfigured;
   }
 

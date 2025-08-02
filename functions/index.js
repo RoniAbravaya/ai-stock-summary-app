@@ -304,22 +304,44 @@ async function processTokenBatchResults(responses, tokens, invalidTokens) {
 
 /**
  * Create mapping from FCM tokens to user IDs
+ * Optimized to only fetch users with matching FCM tokens
  */
 async function getTokenToUserMapping(tokens) {
   const tokenToUserMap = {};
   
   try {
-    const usersSnapshot = await admin
-        .firestore()
-        .collection("users")
-        .get();
+    // Use batched queries to fetch only users with matching tokens
+    // This is more efficient than fetching all users
+    const batchSize = 10; // Firestore 'in' query limit is 10
+    const tokenBatches = [];
+    
+    // Split tokens into batches of 10
+    for (let i = 0; i < tokens.length; i += batchSize) {
+      tokenBatches.push(tokens.slice(i, i + batchSize));
+    }
+    
+    // Process each batch
+    for (const tokenBatch of tokenBatches) {
+      try {
+        const usersSnapshot = await admin
+            .firestore()
+            .collection("users")
+            .where("fcmToken", "in", tokenBatch)
+            .get();
 
-    usersSnapshot.forEach((doc) => {
-      const userData = doc.data();
-      if (userData.fcmToken && tokens.includes(userData.fcmToken)) {
-        tokenToUserMap[userData.fcmToken] = doc.id;
+        usersSnapshot.forEach((doc) => {
+          const userData = doc.data();
+          if (userData.fcmToken && tokenBatch.includes(userData.fcmToken)) {
+            tokenToUserMap[userData.fcmToken] = doc.id;
+          }
+        });
+      } catch (batchError) {
+        logger.warn("⚠️ Error processing token batch:", batchError.message);
+        // Continue with other batches even if one fails
       }
-    });
+    }
+    
+    logger.info(`✅ Created token mapping for ${Object.keys(tokenToUserMap).length}/${tokens.length} tokens`);
   } catch (error) {
     logger.error("❌ Error creating token to user mapping:", error);
   }

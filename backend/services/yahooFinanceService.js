@@ -256,9 +256,16 @@ class YahooFinanceService {
             timeout: 15000
           });
 
-          console.log(`✅ API Response Status: ${response.status}`);
-          console.log(`✅ Response data type: ${Array.isArray(response.data) ? 'Array' : typeof response.data}`);
-          console.log(`✅ Response keys:`, Object.keys(response.data || {}));
+                console.log(`✅ API Response Status: ${response.status}`);
+      console.log(`✅ Response data type: ${Array.isArray(response.data) ? 'Array' : typeof response.data}`);
+      // Sanitize response keys to avoid logging sensitive data
+      const safeKeys = Object.keys(response.data || {}).filter(key => 
+        !key.toLowerCase().includes('key') && 
+        !key.toLowerCase().includes('token') && 
+        !key.toLowerCase().includes('secret') &&
+        !key.toLowerCase().includes('password')
+      );
+      console.log(`✅ Response keys:`, safeKeys);
 
           if (response.data) {
             // Handle different response formats
@@ -370,8 +377,15 @@ class YahooFinanceService {
             timeout: 15000
           });
 
-          console.log(`✅ Chart API Response Status: ${response.status}`);
-          console.log(`✅ Chart response keys:`, Object.keys(response.data || {}));
+                console.log(`✅ Chart API Response Status: ${response.status}`);
+      // Sanitize chart response keys to avoid logging sensitive data
+      const safeChartKeys = Object.keys(response.data || {}).filter(key => 
+        !key.toLowerCase().includes('key') && 
+        !key.toLowerCase().includes('token') && 
+        !key.toLowerCase().includes('secret') &&
+        !key.toLowerCase().includes('password')
+      );
+      console.log(`✅ Chart response keys:`, safeChartKeys);
 
           if (response.data && (response.data.items || response.data.body || response.data.data)) {
             const chartData = response.data.items || response.data.body || response.data.data || response.data;
@@ -469,7 +483,14 @@ class YahooFinanceService {
           });
 
           console.log(`✅ Search API Response Status: ${response.status}`);
-          console.log(`✅ Search response keys:`, Object.keys(response.data || {}));
+          // Sanitize search response keys to avoid logging sensitive data
+      const safeSearchKeys = Object.keys(response.data || {}).filter(key => 
+        !key.toLowerCase().includes('key') && 
+        !key.toLowerCase().includes('token') && 
+        !key.toLowerCase().includes('secret') &&
+        !key.toLowerCase().includes('password')
+      );
+      console.log(`✅ Search response keys:`, safeSearchKeys);
 
           if (response.data) {
             let searchResults = [];

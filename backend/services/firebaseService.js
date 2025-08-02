@@ -20,6 +20,18 @@ class FirebaseService {
   }
 
   /**
+   * Safely parse JSON with error handling
+   */
+  safeJsonParse(jsonString, defaultValue = null) {
+    try {
+      return jsonString ? JSON.parse(jsonString) : defaultValue;
+    } catch (error) {
+      console.error('❌ Failed to parse JSON:', error.message);
+      return defaultValue;
+    }
+  }
+
+  /**
    * Get initialization status
    */
   get isInitialized() {
@@ -38,10 +50,11 @@ class FirebaseService {
       // Check if running in Cloud Run
       if (process.env.K_SERVICE) {
         // In Cloud Run, use the default credentials
+        const firebaseConfig = this.safeJsonParse(process.env.FIREBASE_CONFIG, {});
         admin.initializeApp({
-          projectId: process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG).projectId : undefined,
-          databaseURL: process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG).databaseURL : undefined,
-          storageBucket: process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG).storageBucket : undefined
+          projectId: firebaseConfig.projectId || undefined,
+          databaseURL: firebaseConfig.databaseURL || undefined,
+          storageBucket: firebaseConfig.storageBucket || undefined
         });
       } else {
         // Local development - use service account

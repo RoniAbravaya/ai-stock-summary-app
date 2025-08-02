@@ -55,8 +55,10 @@ service cloud.firestore {
     match /admin_notifications/{notificationId} {
       // Admins can create notifications
       allow create: if request.auth != null && request.auth.token.admin == true;
-      // Cloud Functions can read and update (no auth required for functions)
-      allow read, update: if true;
+      // Cloud Functions (authenticated with service account) and admins can read and update
+      allow read, update: if request.auth != null && 
+        (request.auth.token.admin == true || 
+         request.auth.token.email_verified == true);
       // Admins can read their own notifications
       allow read: if request.auth != null && request.auth.token.admin == true;
     }

@@ -308,6 +308,9 @@ async function processTokenBatchResults(responses, tokens, invalidTokens) {
 async function getTokenToUserMapping(tokens) {
   const tokenToUserMap = {};
   
+  // Use a Set for O(1) look-ups instead of the O(n) array.includes check
+  const tokenSet = new Set(tokens);
+  
   try {
     const usersSnapshot = await admin
         .firestore()
@@ -316,7 +319,7 @@ async function getTokenToUserMapping(tokens) {
 
     usersSnapshot.forEach((doc) => {
       const userData = doc.data();
-      if (userData.fcmToken && tokens.includes(userData.fcmToken)) {
+      if (userData.fcmToken && tokenSet.has(userData.fcmToken)) {
         tokenToUserMap[userData.fcmToken] = doc.id;
       }
     });

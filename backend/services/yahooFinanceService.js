@@ -178,10 +178,10 @@ class YahooFinanceService {
   }
 
   /**
-   * Validate if API key is configured
+   * Check if the RapidAPI integration is configured correctly
    * @returns {boolean} True if API key is set
    */
-  isConfigured() {
+  isApiConfigured() {
     return this.isConfigured;
   }
 

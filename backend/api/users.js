@@ -115,6 +115,15 @@ router.post('/:uid/favorites', validateUserId, async (req, res) => {
       });
     }
 
+    // Reject ticker symbols containing characters that are invalid for Firebase keys
+    if (!/^[A-Za-z]+$/.test(ticker)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ticker symbol contains invalid characters',
+        timestamp: new Date().toISOString()
+      });
+    }
+
     const normalizedTicker = ticker.toUpperCase();
 
     if (!firebaseService.database) {

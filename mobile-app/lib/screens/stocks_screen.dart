@@ -7,6 +7,7 @@ import '../widgets/environment_switcher.dart';
 import '../services/feature_flag_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class StocksScreen extends StatefulWidget {
   const StocksScreen({super.key, required this.firebaseEnabled});
@@ -405,7 +406,7 @@ class _StocksScreenState extends State<StocksScreen> {
               ),
             ],
           ),
-          onTap: () {},
+          onTap: () => _showStockDetails(stock.symbol),
         ),
       );
     }
@@ -413,7 +414,7 @@ class _StocksScreenState extends State<StocksScreen> {
     final theme = Theme.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(14),
-      onTap: () {},
+      onTap: () => _showStockDetails(stock.symbol),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
@@ -636,7 +637,7 @@ class _StocksScreenState extends State<StocksScreen> {
 }
 
 // Placeholder screens for navigation
-class StockDetailsScreen extends StatelessWidget {
+class StockDetailsScreen extends StatefulWidget {
   const StockDetailsScreen({
     super.key,
     required this.symbol,
@@ -647,25 +648,37 @@ class StockDetailsScreen extends StatelessWidget {
   final bool firebaseEnabled;
 
   @override
+  State<StockDetailsScreen> createState() => _StockDetailsScreenState();
+}
+
+enum _ChartRange { oneW, oneM }
+
+class _StockDetailsScreenState extends State<StockDetailsScreen> {
+  final StockService _stockService = StockService();
+  late Future<Stock> _stockFuture;
+  _ChartRange _selectedRange = _ChartRange.oneM;
+
+  @override
+  void initState() {
+    super.initState();
+    _stockFuture = _stockService.getStock(widget.symbol);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final bool redesign = FeatureFlagService().redesignEnabled;
 
     if (!redesign) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text('$symbol Details'),
-        ),
+        appBar: AppBar(title: Text('${widget.symbol} Details')),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.info_outline, size: 64, color: Colors.grey.shade400),
               const SizedBox(height: 16),
-              Text(
-                'Stock Details for $symbol',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              Text('Stock Details for ${widget.symbol}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               const Text('Detailed view coming soon...'),
             ],
@@ -674,156 +687,303 @@ class StockDetailsScreen extends StatelessWidget {
       );
     }
 
-    // Redesigned details screen (header + placeholders)
     return Scaffold(
-      appBar: AppBar(
-        title: Text(symbol),
+      appBar: AppBar(title: Text(widget.symbol)),
+      body: FutureBuilder<Stock>(
+        future: _stockFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Failed to load: ${snapshot.error}'));
+          }
+          final stock = snapshot.data;
+          if (stock == null) {
+            return const Center(child: Text('No data'));
+          }
+          return _buildContent(context, stock);
+        },
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header card
-            Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: theme.colorScheme.primary,
-                    child: Text(
-                      symbol.substring(0, symbol.length > 2 ? 2 : 1),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          symbol,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          'Company name • Sector',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.grey.shade700,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'Add to favorites',
-                        icon: const Icon(Icons.favorite_border),
-                        onPressed: () => _addToFavorites(context, symbol),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, Stock stock) {
+    final theme = Theme.of(context);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(theme, stock),
+          const SizedBox(height: 16),
+          _buildChartCard(theme, stock),
+          const SizedBox(height: 16),
+          _buildSummaryCard(theme, stock),
+          const SizedBox(height: 16),
+          _buildActionsRow(stock.symbol),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(ThemeData theme, Stock stock) {
+    final priceColor = (stock.isPositiveChange) ? Colors.green : Colors.red;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: theme.colorScheme.primary,
+            child: Text(
+              stock.symbol.substring(0, stock.symbol.length > 2 ? 2 : 1),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
-
-            const SizedBox(height: 16),
-
-            // Chart placeholder
-            Container(
-              height: 220,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.show_chart, size: 48, color: Colors.grey.shade400),
-                    const SizedBox(height: 8),
-                    Text('Chart coming soon', style: TextStyle(color: Colors.grey.shade600)),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // AI Summary placeholder
-            Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('AI Summary', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  Text(
-                    'An AI-generated summary for $symbol will appear here, highlighting key trends, recent news, and potential risks.',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Actions row
-            Row(
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () => _shareSymbol(symbol),
-                  icon: const Icon(Icons.ios_share),
-                  label: const Text('Share'),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: () => _openInBrowser(symbol),
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('Open'),
-                ),
+                Text(stock.symbol,
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                Text(stock.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade700)),
               ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(stock.formattedPrice,
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              Text('${stock.formattedChange} (${stock.formattedChangePercent})',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: priceColor,
+                    fontWeight: FontWeight.w600,
+                  )),
+            ],
+          ),
+          IconButton(
+            tooltip: 'Add to favorites',
+            icon: const Icon(Icons.favorite_border),
+            onPressed: () => _addToFavorites(context, stock.symbol),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChartCard(ThemeData theme, Stock stock) {
+    final chart = stock.chart;
+    if (chart == null || chart.dataPoints.isEmpty) {
+      return Container(
+        height: 220,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
+        child: Center(
+          child: Text('No chart data', style: TextStyle(color: Colors.grey.shade600)),
+        ),
+      );
+    }
+
+    final filtered = _filterPoints(chart.dataPoints, _selectedRange);
+    final isUp = (chart.priceChange ?? 0) >= 0;
+    final lineColor = isUp ? const Color(0xFF16a34a) : const Color(0xFFdc2626);
+    final gradient = LinearGradient(
+      colors: [lineColor.withOpacity(0.35), lineColor.withOpacity(0.05)],
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+    );
+
+    // Build FL spots
+    final spots = <FlSpot>[];
+    for (int i = 0; i < filtered.length; i++) {
+      spots.add(FlSpot(i.toDouble(), filtered[i].close));
+    }
+
+    // Compute y-range with padding
+    double minY = filtered.first.close;
+    double maxY = filtered.first.close;
+    for (final p in filtered) {
+      if (p.close < minY) minY = p.close;
+      if (p.close > maxY) maxY = p.close;
+    }
+    final yPad = (maxY - minY) * 0.1;
+    minY -= yPad;
+    maxY += yPad;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ChoiceChip(
+                label: const Text('1W'),
+                selected: _selectedRange == _ChartRange.oneW,
+                onSelected: (_) => setState(() => _selectedRange = _ChartRange.oneW),
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: const Text('1M'),
+                selected: _selectedRange == _ChartRange.oneM,
+                onSelected: (_) => setState(() => _selectedRange = _ChartRange.oneM),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 240,
+            child: LineChart(
+              LineChartData(
+                minY: minY,
+                maxY: maxY,
+                gridData: FlGridData(show: false),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 26,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.round();
+                        if (index < 0 || index >= filtered.length) {
+                          return const SizedBox.shrink();
+                        }
+                        // Show first, middle, last labels
+                        if (index == 0 || index == filtered.length - 1 || index == (filtered.length / 2).round()) {
+                          final d = filtered[index].date;
+                          final label = '${d.month}/${d.day}';
+                          return Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 11));
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineTouchData: LineTouchData(
+                  handleBuiltInTouches: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    tooltipRoundedRadius: 8,
+                    tooltipBgColor: theme.colorScheme.surface.withOpacity(0.9),
+                  ),
+                ),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: lineColor,
+                    barWidth: 2.4,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: gradient,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<ChartDataPoint> _filterPoints(List<ChartDataPoint> points, _ChartRange range) {
+    if (points.isEmpty) return points;
+    switch (range) {
+      case _ChartRange.oneW:
+        final count = points.length;
+        final start = count > 7 ? count - 7 : 0;
+        return points.sublist(start);
+      case _ChartRange.oneM:
+        return points;
+    }
+  }
+
+  Widget _buildSummaryCard(ThemeData theme, Stock stock) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('AI Summary', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Text(
+            'An AI-generated summary for ${stock.symbol} will appear here, highlighting key trends, recent news, and potential risks.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionsRow(String symbol) {
+    return Row(
+      children: [
+        OutlinedButton.icon(
+          onPressed: () => _shareSymbol(symbol),
+          icon: const Icon(Icons.ios_share),
+          label: const Text('Share'),
+        ),
+        const SizedBox(width: 12),
+        OutlinedButton.icon(
+          onPressed: () => _openInBrowser(symbol),
+          icon: const Icon(Icons.open_in_new),
+          label: const Text('Open'),
+        ),
+      ],
     );
   }
 }

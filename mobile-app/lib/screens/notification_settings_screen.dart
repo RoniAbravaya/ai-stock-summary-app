@@ -4,6 +4,7 @@ import '../config/app_config.dart';
 import '../services/firebase_service.dart';
 import '../services/language_service.dart';
 import 'notification_history_screen.dart';
+import '../services/feature_flag_service.dart';
 
 /// Notification Settings Screen
 /// Allows users to manage notification preferences with a master toggle
@@ -61,16 +62,14 @@ class _NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final redesign = FeatureFlagService().redesignEnabled;
     return Scaffold(
       appBar: AppBar(
         title: Text(LanguageService().translate('settings_notifications')),
-        backgroundColor: Color(AppConfig.primaryBlue),
-        foregroundColor: Colors.white,
       ),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _buildNotificationSettings(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : (redesign ? _buildRedesigned() : _buildNotificationSettings()),
     );
   }
 
@@ -138,6 +137,88 @@ class _NotificationSettingsScreenState
         const SizedBox(height: 24),
 
         // Status Card
+        _buildStatusCard(),
+      ],
+    );
+  }
+
+  Widget _buildRedesigned() {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Header container
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.notifications_active, color: theme.colorScheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      LanguageService().translate('notif_settings_title'),
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                LanguageService().translate('notif_settings_desc'),
+                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Main settings container
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              _buildMasterToggle(),
+              const Divider(height: 1),
+              _buildNotificationHistoryTile(),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+        _buildInformationCard(),
+        const SizedBox(height: 24),
         _buildStatusCard(),
       ],
     );

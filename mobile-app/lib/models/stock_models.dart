@@ -111,15 +111,33 @@ class ChartDataPoint {
   });
 
   factory ChartDataPoint.fromJson(Map<String, dynamic> json) {
+    // Parse date from multiple possible shapes
+    DateTime parsedDate;
+    final dynamic rawTimestamp = json['date_utc'] ?? json['timestamp'];
+    if (rawTimestamp is num) {
+      parsedDate = DateTime.fromMillisecondsSinceEpoch(rawTimestamp.toInt() * 1000);
+    } else if (json['date'] is String) {
+      // ISO string like 2025-07-26
+      parsedDate = DateTime.tryParse(json['date'] as String) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    } else {
+      parsedDate = DateTime.fromMillisecondsSinceEpoch(0);
+    }
+
+    double toDouble(dynamic v) {
+      if (v is num) return v.toDouble();
+      if (v is String) return double.tryParse(v) ?? 0;
+      return 0;
+    }
+
     return ChartDataPoint(
-      date: DateTime.fromMillisecondsSinceEpoch(
-        (json['date_utc'] ?? json['timestamp'] ?? 0) * 1000,
-      ),
-      open: (json['open'] ?? 0).toDouble(),
-      high: (json['high'] ?? 0).toDouble(),
-      low: (json['low'] ?? 0).toDouble(),
-      close: (json['close'] ?? 0).toDouble(),
-      volume: json['volume'] ?? 0,
+      date: parsedDate,
+      open: toDouble(json['open'] ?? json['o']),
+      high: toDouble(json['high'] ?? json['h']),
+      low: toDouble(json['low'] ?? json['l']),
+      close: toDouble(json['close'] ?? json['c'] ?? json['adjClose'] ?? json['Close'] ?? json['price']),
+      volume: (json['volume'] is String)
+          ? (int.tryParse(json['volume']) ?? 0)
+          : (json['volume'] as int? ?? 0),
     );
   }
 }
@@ -140,25 +158,52 @@ class StockChart {
   });
 
   factory StockChart.fromJson(Map<String, dynamic> json) {
-    final items = json['items'] as Map<String, dynamic>? ?? {};
     final dataPoints = <ChartDataPoint>[];
 
-    items.forEach((timestamp, data) {
-      if (data is Map<String, dynamic>) {
-        dataPoints.add(ChartDataPoint.fromJson({
-          ...data,
-          'timestamp': int.tryParse(timestamp) ?? 0,
-        }));
+    // Case 1: items is a map of timestamp -> OHLC
+    final items = json['items'];
+    if (items is Map<String, dynamic>) {
+      items.forEach((timestamp, data) {
+        if (data is Map<String, dynamic>) {
+          dataPoints.add(ChartDataPoint.fromJson({
+            ...data,
+            'timestamp': int.tryParse(timestamp) ?? 0,
+          }));
+        }
+      });
+    }
+
+    // Case 2: data is an array of OHLC rows
+    if (dataPoints.isEmpty && json['data'] is List) {
+      for (final row in (json['data'] as List)) {
+        if (row is Map<String, dynamic>) {
+          dataPoints.add(ChartDataPoint.fromJson(row));
+        }
       }
-    });
+    }
+
+    // Case 3: body is an array of OHLC rows
+    if (dataPoints.isEmpty && json['body'] is List) {
+      for (final row in (json['body'] as List)) {
+        if (row is Map<String, dynamic>) {
+          dataPoints.add(ChartDataPoint.fromJson(row));
+        }
+      }
+    }
 
     // Sort by date
     dataPoints.sort((a, b) => a.date.compareTo(b.date));
 
+    // Meta fallbacks
+    final meta = json['meta'] as Map<String, dynamic>? ?? {};
+    final symbol = (meta['symbol'] ?? json['symbol'] ?? '').toString();
+    final interval = (meta['dataGranularity'] ?? json['interval'] ?? '1d').toString();
+    final range = (meta['range'] ?? json['range'] ?? '1mo').toString();
+
     return StockChart(
-      symbol: json['meta']?['symbol'] ?? '',
-      interval: json['meta']?['dataGranularity'] ?? '1d',
-      range: json['meta']?['range'] ?? '1mo',
+      symbol: symbol,
+      interval: interval,
+      range: range,
       dataPoints: dataPoints,
       lastUpdated: DateTime.now(),
     );
@@ -285,7 +330,7 @@ class StockFavorite {
 
   factory StockFavorite.fromJson(Map<String, dynamic> json) {
     return StockFavorite(
-      ticker: json['ticker'] ?? '',
+      ticker: (json['ticker'] ?? json['symbol'] ?? '').toString(),
       addedAt: DateTime.fromMillisecondsSinceEpoch(
         json['addedAt'] ?? DateTime.now().millisecondsSinceEpoch,
       ),

@@ -6,12 +6,17 @@ import 'firebase_options.dart';
 import 'services/firebase_service.dart';
 import 'services/mock_data_service.dart';
 import 'services/language_service.dart';
+import 'services/feature_flag_service.dart';
+import 'services/stock_service.dart';
+import 'models/stock_models.dart';
 import 'config/app_config.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/language_settings_screen.dart';
 import 'screens/notification_settings_screen.dart';
 import 'screens/news_screen.dart';
 import 'screens/stocks_screen.dart';
 import 'dart:async';
+import 'dart:ui' as ui;
 
 // Top-level function to handle background messages
 @pragma('vm:entry-point')
@@ -70,6 +75,14 @@ void main() async {
     print('⚠️ Language service initialization failed: $e');
   }
 
+  // Initialize Feature Flags (redesign default OFF, persisted)
+  try {
+    await FeatureFlagService().initialize();
+    print('✅ Feature flags initialized (redesign=${FeatureFlagService().redesignEnabled})');
+  } catch (e) {
+    print('⚠️ Feature flags initialization failed: $e');
+  }
+
   runApp(AIStockSummaryApp(firebaseEnabled: firebaseInitialized));
 }
 
@@ -85,6 +98,7 @@ class AIStockSummaryApp extends StatefulWidget {
 class _AIStockSummaryAppState extends State<AIStockSummaryApp> {
   final LanguageService _languageService = LanguageService();
   late StreamController<String> _languageStreamController;
+  final FeatureFlagService _featureFlags = FeatureFlagService();
 
   @override
   void initState() {
@@ -103,51 +117,197 @@ class _AIStockSummaryAppState extends State<AIStockSummaryApp> {
     return StreamBuilder<String>(
       stream: _languageStreamController.stream,
       initialData: _languageService.currentLanguage,
-      builder: (context, snapshot) {
-        return MaterialApp(
-          title: _languageService.translate('app_name'),
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Color(AppConfig.primaryBlue),
-              brightness: Brightness.light,
-            ),
-            useMaterial3: true,
-            fontFamily: AppTextStyles.fontFamily,
-            appBarTheme: AppBarTheme(
-              centerTitle: true,
-              elevation: 0,
-              backgroundColor: Color(AppConfig.primaryBlue),
-              foregroundColor: Colors.white,
-            ),
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(AppConfig.primaryBlue),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+      builder: (context, langSnap) {
+        return StreamBuilder<bool>(
+          stream: _featureFlags.redesignStream,
+          initialData: _featureFlags.redesignEnabled,
+          builder: (context, flagSnap) {
+            final bool redesign = flagSnap.data ?? false;
+            final ThemeData lightTheme = redesign
+                ? _buildRedesignLightTheme()
+                : ThemeData(
+                    colorScheme: ColorScheme.fromSeed(
+                      seedColor: Color(AppConfig.primaryBlue),
+                      brightness: Brightness.light,
+                    ),
+                    useMaterial3: true,
+                    fontFamily: AppTextStyles.fontFamily,
+                    appBarTheme: const AppBarTheme(
+                      centerTitle: true,
+                      elevation: 0,
+                      backgroundColor: Color(AppConfig.primaryBlue),
+                      foregroundColor: Colors.white,
+                    ),
+                    elevatedButtonTheme: ElevatedButtonThemeData(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(AppConfig.primaryBlue),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  );
+
+            final ThemeData darkTheme = redesign
+                ? _buildRedesignDarkTheme()
+                : ThemeData(
+                    colorScheme: ColorScheme.fromSeed(
+                      seedColor: Color(AppConfig.primaryBlue),
+                      brightness: Brightness.dark,
+                    ),
+                    useMaterial3: true,
+                    fontFamily: AppTextStyles.fontFamily,
+                  );
+
+            return MaterialApp(
+              title: _languageService.translate('app_name'),
+              theme: lightTheme,
+              darkTheme: darkTheme,
+              debugShowCheckedModeBanner: AppConfig.isDevelopment,
+              home: AuthWrapper(
+                firebaseEnabled: widget.firebaseEnabled,
+                onLanguageChanged: () {
+                  _languageStreamController
+                      .add(_languageService.currentLanguage);
+                },
               ),
-            ),
-          ),
-          darkTheme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Color(AppConfig.primaryBlue),
-              brightness: Brightness.dark,
-            ),
-            useMaterial3: true,
-            fontFamily: AppTextStyles.fontFamily,
-          ),
-          debugShowCheckedModeBanner: AppConfig.isDevelopment,
-          home: AuthWrapper(
-            firebaseEnabled: widget.firebaseEnabled,
-            onLanguageChanged: () {
-              _languageStreamController.add(_languageService.currentLanguage);
-            },
-          ),
+            );
+          },
         );
       },
     );
   }
+}
+
+ThemeData _buildRedesignLightTheme() {
+  // Minimal lift from example theme to avoid importing its tree
+  // Colors reflect professional blue and light surfaces
+  const primary = Color(0xFF1B365D);
+  const secondary = Color(0xFFFF6B35);
+  const surface = Colors.white;
+  const background = Color(0xFFFAFBFC);
+
+  return ThemeData(
+    brightness: Brightness.light,
+    colorScheme: const ColorScheme.light(
+      primary: primary,
+      secondary: secondary,
+      surface: surface,
+      background: background,
+      error: Color(0xFFEF4444),
+    ),
+    scaffoldBackgroundColor: background,
+    cardTheme: CardThemeData(
+      color: surface,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: surface,
+      foregroundColor: const Color(0xFF1F2937),
+      elevation: 0,
+      centerTitle: true,
+      titleTextStyle: GoogleFonts.inter(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: const Color(0xFF1F2937),
+      ),
+    ),
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      backgroundColor: surface,
+      selectedItemColor: primary,
+      unselectedItemColor: const Color(0xFF6B7280),
+      type: BottomNavigationBarType.fixed,
+      elevation: 8,
+      selectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+      unselectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        elevation: 2,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: primary,
+        side: const BorderSide(color: primary, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      ),
+    ),
+    useMaterial3: true,
+    fontFamily: AppTextStyles.fontFamily,
+  );
+}
+
+ThemeData _buildRedesignDarkTheme() {
+  const primary = Color(0xFF4A90E2);
+  const secondary = Color(0xFFFF6B35);
+  const surface = Color(0xFF1E293B);
+  const background = Color(0xFF0F172A);
+
+  return ThemeData(
+    brightness: Brightness.dark,
+    colorScheme: const ColorScheme.dark(
+      primary: primary,
+      secondary: secondary,
+      surface: surface,
+      background: background,
+      error: Color(0xFFEF4444),
+    ),
+    scaffoldBackgroundColor: background,
+    cardTheme: CardThemeData(
+      color: surface,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: surface,
+      foregroundColor: const Color(0xFFF8FAFC),
+      elevation: 0,
+      centerTitle: true,
+      titleTextStyle: GoogleFonts.inter(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: const Color(0xFFF8FAFC),
+      ),
+    ),
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      backgroundColor: surface,
+      selectedItemColor: primary,
+      unselectedItemColor: const Color(0xFFCBD5E1),
+      type: BottomNavigationBarType.fixed,
+      elevation: 8,
+      selectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+      unselectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        elevation: 2,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: primary,
+        side: const BorderSide(color: primary, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      ),
+    ),
+    useMaterial3: true,
+    fontFamily: AppTextStyles.fontFamily,
+  );
 }
 
 class AuthWrapper extends StatelessWidget {
@@ -724,14 +884,57 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Color(AppConfig.primaryBlue),
-        unselectedItemColor: Color(AppConfig.textLight),
-        items: _navItems,
-      ),
+      bottomNavigationBar: FeatureFlagService().redesignEnabled
+          ? SafeArea(
+              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Stack(
+                  children: [
+                    // Subtle blur backdrop
+                    Positioned.fill(
+                      child: BackdropFilter(
+                        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: const SizedBox.shrink(),
+                      ),
+                    ),
+                    // Pill container with shadow
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                                .bottomNavigationBarTheme
+                                .backgroundColor ??
+                            Theme.of(context).colorScheme.surface.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: BottomNavigationBar(
+                        currentIndex: _currentIndex,
+                        onTap: (index) => setState(() => _currentIndex = index),
+                        type: BottomNavigationBarType.fixed,
+                        backgroundColor: Colors.transparent,
+                        elevation: 0,
+                        items: _navItems,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : BottomNavigationBar(
+              currentIndex: _currentIndex,
+              onTap: (index) => setState(() => _currentIndex = index),
+              type: BottomNavigationBarType.fixed,
+              selectedItemColor: Color(AppConfig.primaryBlue),
+              unselectedItemColor: Color(AppConfig.textLight),
+              items: _navItems,
+            ),
     );
   }
 }
@@ -768,7 +971,7 @@ class DashboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: firebaseEnabled ? _buildFirebaseContent() : _buildMockContent(),
+      body: _buildFirebaseContent(),
     );
   }
 
@@ -781,11 +984,11 @@ class DashboardScreen extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
-          return _buildMockContent(); // Fallback to mock data
+          return const _EmptyFavorites();
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildMockContent(); // Fallback to mock data
+          return const _EmptyFavorites();
         }
 
         return ListView.builder(
@@ -900,16 +1103,91 @@ class DashboardScreen extends StatelessWidget {
 }
 
 // Favorites Screen - AI Summary and Generate Button
-class FavoritesScreen extends StatelessWidget {
+class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key, required this.firebaseEnabled});
 
   final bool firebaseEnabled;
 
   @override
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Favorites')),
-      body: firebaseEnabled ? _buildFirebaseContent() : _buildMockContent(),
+      body: _buildRealtimeFavorites(),
+    );
+  }
+
+  Widget _buildRealtimeFavorites() {
+    final user = FirebaseService().auth.currentUser;
+    if (user == null) {
+      return const Center(child: Text('Please sign in to view favorites'));
+    }
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseService()
+          .firestore
+          .collection('favorites')
+          .doc(user.uid)
+          .collection('stocks')
+          .orderBy('addedAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Failed to load favorites'));
+        }
+        final docs = snapshot.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return const _EmptyFavorites();
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final symbol = (data['stockId'] as String?) ?? docs[index].id;
+            return _buildFavoriteCard(context, symbol);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildApiFavoritesContent() {
+    final user = FirebaseService().auth.currentUser;
+    if (user == null) {
+      return const Center(child: Text('Please sign in to view favorites'));
+    }
+    return RefreshIndicator(
+      onRefresh: () async { if (mounted) setState(() {}); },
+      child: FutureBuilder<List<Stock>>(
+        future: StockService().getFavoriteStocks(user.uid),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Failed to load favorites: ${snapshot.error}'));
+          }
+          final stocks = snapshot.data ?? [];
+          if (stocks.isEmpty) {
+            return const _EmptyFavorites();
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: stocks.length,
+            itemBuilder: (context, index) {
+              final stock = stocks[index];
+              return _buildFavoriteCard(context, stock.symbol);
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -922,11 +1200,11 @@ class FavoritesScreen extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
-          return _buildMockContent(); // Fallback to mock data
+          return const _EmptyFavorites();
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildMockContent(); // Fallback to mock data
+          return const _EmptyFavorites();
         }
 
         return ListView.builder(
@@ -944,40 +1222,7 @@ class FavoritesScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMockContent() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: MockDataService().getFavorites(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.favorite_border, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text('No favorites yet', style: TextStyle(fontSize: 18)),
-                SizedBox(height: 8),
-                Text('Add stocks from Dashboard to generate AI summaries'),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.length,
-          itemBuilder: (context, index) {
-            final favorite = snapshot.data![index];
-            return _buildFavoriteCard(context, favorite['stockId']);
-          },
-        );
-      },
-    );
-  }
+  // Mock content removed; we now rely on Firestore favorites only
 
   Widget _buildFavoriteCard(BuildContext context, String stockId) {
     return Card(
@@ -1021,7 +1266,7 @@ class FavoritesScreen extends StatelessWidget {
   }
 
   Widget _buildSummaryContent(String stockId) {
-    if (firebaseEnabled) {
+    if (FirebaseService().isFirestoreAvailable) {
       return FutureBuilder<DocumentSnapshot>(
         future: FirebaseService().getStockSummary(stockId),
         builder: (context, summarySnapshot) {
@@ -1038,24 +1283,15 @@ class FavoritesScreen extends StatelessWidget {
               print('❌ Error parsing summary data: $e');
             }
           }
-          return _buildMockSummaryContent(stockId);
+          return const Text('No summary generated yet');
         },
       );
-    } else {
-      return _buildMockSummaryContent(stockId);
     }
+    return const Text('No summary generated yet');
   }
 
   Widget _buildMockSummaryContent(String stockId) {
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: MockDataService().getSummary(stockId),
-      builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data != null) {
-          return _buildSummaryContainer(snapshot.data!['content']);
-        }
-        return const Text('No summary generated yet');
-      },
-    );
+    return const Text('No summary generated yet');
   }
 
   Widget _buildSummaryContainer(String content) {
@@ -1082,23 +1318,58 @@ class FavoritesScreen extends StatelessWidget {
 
   void _removeFromFavorites(BuildContext context, String stockId) async {
     try {
-      if (firebaseEnabled) {
-        await FirebaseService().removeFromFavorites(stockId);
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Removed from favorites')));
+      // Use Firestore for real-time sync
+      await FirebaseService().removeFromFavorites(stockId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Removed from favorites')));
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
   }
 
   void _generateAISummary(BuildContext context, String stockId) async {
-    // TODO: Implement AI summary generation via backend API
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('AI Summary generation coming soon...')),
+    try {
+      final content = await StockService().generateAISummary(stockId);
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('AI Summary — $stockId'),
+          content: SingleChildScrollView(child: Text(content)),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('AI summary failed: $e')),
+      );
+    }
+  }
+
+  // Simple empty state widget
+}
+
+class _EmptyFavorites extends StatelessWidget {
+  const _EmptyFavorites();
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(Icons.favorite_border, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('No favorites yet', style: TextStyle(fontSize: 18)),
+          SizedBox(height: 8),
+          Text('Add stocks from Stocks to build your list'),
+        ],
+      ),
     );
   }
 }
@@ -1472,58 +1743,142 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         const SizedBox(height: 16),
 
-        // Settings Card
-        Card(
-          child: Column(
-            children: [
-              _buildSettingsTile(
-                context: context,
-                icon: Icons.notifications,
-                title: LanguageService().translate('settings_notifications'),
-                subtitle: LanguageService().translate(
-                  'settings_notifications_desc',
+        // Settings (feature-flagged styling)
+        FeatureFlagService().redesignEnabled
+            ? Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                onTap: () => _openNotificationSettings(context),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      value: FeatureFlagService().redesignEnabled,
+                      onChanged: (enabled) async {
+                        await FeatureFlagService().setRedesignEnabled(enabled);
+                        if (mounted) setState(() {});
+                      },
+                      title: const Text('Use new design'),
+                      subtitle: const Text('Toggle the redesigned theme'),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: _settingsIcon(context, Icons.notifications),
+                      title: Text(LanguageService().translate('settings_notifications')),
+                      subtitle: Text(LanguageService().translate('settings_notifications_desc')),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openNotificationSettings(context),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: _settingsIcon(context, Icons.language),
+                      title: Text(LanguageService().translate('settings_language')),
+                      subtitle: Text(LanguageService().translate('settings_language_desc')),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openLanguageSettings(context),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: _settingsIcon(context, Icons.help_outline),
+                      title: Text(LanguageService().translate('settings_help')),
+                      subtitle: Text(LanguageService().translate('settings_help_desc')),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openHelpSupport(context),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: _settingsIcon(context, Icons.privacy_tip_outlined),
+                      title: Text(LanguageService().translate('settings_privacy')),
+                      subtitle: Text(LanguageService().translate('settings_privacy_desc')),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openPrivacyPolicy(context),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: _settingsIcon(context, Icons.logout, color: Colors.red),
+                      title: Text(
+                        LanguageService().translate('auth_sign_out'),
+                        style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        widget.firebaseEnabled
+                            ? LanguageService().translate('settings_sign_out_desc')
+                            : LanguageService().translate('settings_demo_sign_out'),
+                      ),
+                      onTap: () => _signOut(context),
+                    ),
+                  ],
+                ),
+              )
+            : Card(
+                child: Column(
+                  children: [
+                    // Redesign toggle (visible even in legacy style)
+                    SwitchListTile(
+                      value: FeatureFlagService().redesignEnabled,
+                      onChanged: (enabled) async {
+                        await FeatureFlagService().setRedesignEnabled(enabled);
+                        if (mounted) setState(() {});
+                      },
+                      title: const Text('Use new design'),
+                      subtitle: const Text('Toggle the redesigned theme'),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.notifications,
+                      title: LanguageService().translate('settings_notifications'),
+                      subtitle: LanguageService().translate(
+                        'settings_notifications_desc',
+                      ),
+                      onTap: () => _openNotificationSettings(context),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.language,
+                      title: LanguageService().translate('settings_language'),
+                      subtitle: LanguageService().translate('settings_language_desc'),
+                      onTap: () => _openLanguageSettings(context),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.help_outline,
+                      title: LanguageService().translate('settings_help'),
+                      subtitle: LanguageService().translate('settings_help_desc'),
+                      onTap: () => _openHelpSupport(context),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.privacy_tip_outlined,
+                      title: LanguageService().translate('settings_privacy'),
+                      subtitle: LanguageService().translate('settings_privacy_desc'),
+                      onTap: () => _openPrivacyPolicy(context),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.logout,
+                      title: LanguageService().translate('auth_sign_out'),
+                      subtitle: widget.firebaseEnabled
+                          ? LanguageService().translate('settings_sign_out_desc')
+                          : LanguageService().translate('settings_demo_sign_out'),
+                      titleColor: Colors.red,
+                      iconColor: Colors.red,
+                      onTap: () => _signOut(context),
+                    ),
+                  ],
+                ),
               ),
-              const Divider(height: 1),
-              _buildSettingsTile(
-                context: context,
-                icon: Icons.language,
-                title: LanguageService().translate('settings_language'),
-                subtitle: LanguageService().translate('settings_language_desc'),
-                onTap: () => _openLanguageSettings(context),
-              ),
-              const Divider(height: 1),
-              _buildSettingsTile(
-                context: context,
-                icon: Icons.help_outline,
-                title: LanguageService().translate('settings_help'),
-                subtitle: LanguageService().translate('settings_help_desc'),
-                onTap: () => _openHelpSupport(context),
-              ),
-              const Divider(height: 1),
-              _buildSettingsTile(
-                context: context,
-                icon: Icons.privacy_tip_outlined,
-                title: LanguageService().translate('settings_privacy'),
-                subtitle: LanguageService().translate('settings_privacy_desc'),
-                onTap: () => _openPrivacyPolicy(context),
-              ),
-              const Divider(height: 1),
-              _buildSettingsTile(
-                context: context,
-                icon: Icons.logout,
-                title: LanguageService().translate('auth_sign_out'),
-                subtitle: widget.firebaseEnabled
-                    ? LanguageService().translate('settings_sign_out_desc')
-                    : LanguageService().translate('settings_demo_sign_out'),
-                titleColor: Colors.red,
-                iconColor: Colors.red,
-                onTap: () => _signOut(context),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -1563,6 +1918,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
+    );
+  }
+
+  Widget _settingsIcon(BuildContext context, IconData icon, {Color? color}) {
+    final bg = (color ?? Theme.of(context).colorScheme.primary).withOpacity(0.1);
+    final fg = color ?? Theme.of(context).colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, color: fg),
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import '../config/app_config.dart';
 import '../services/firebase_service.dart';
 import '../services/language_service.dart';
+import '../services/feature_flag_service.dart';
 
 /// Notification History Screen
 /// Displays all notifications ever received by the user
@@ -53,11 +54,10 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final redesign = FeatureFlagService().redesignEnabled;
     return Scaffold(
       appBar: AppBar(
         title: Text(LanguageService().translate('notif_history_title')),
-        backgroundColor: Color(AppConfig.primaryBlue),
-        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -65,7 +65,7 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: redesign ? _buildRedesignedBody() : _buildBody(),
     );
   }
 
@@ -184,6 +184,171 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRedesignedBody() {
+    if (_isLoading && _notifications.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_notifications.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    final theme = Theme.of(context);
+    return RefreshIndicator(
+      onRefresh: _refreshNotifications,
+      child: Column(
+        children: [
+          // Header (light surface with stats)
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: _buildHeader(),
+          ),
+
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16),
+              itemCount: _notifications.length + (_hasMoreData ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == _notifications.length) {
+                  return _buildLoadingIndicator();
+                }
+                return _buildRedesignedTile(_notifications[index], index);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRedesignedTile(Map<String, dynamic> notification, int index) {
+    final isRead = notification['isRead'] ?? false;
+    final timestamp = notification['timestamp'] as Timestamp?;
+    final title = notification['title'] ?? LanguageService().translate('notif_no_title');
+    final body = notification['body'] ?? '';
+    final type = notification['type'] ?? 'system';
+
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => _markAsRead(notification['id'], index),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: isRead
+              ? null
+              : Border.all(color: theme.colorScheme.primary.withOpacity(0.2), width: 1),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _getTypeColor(type).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(_getTypeIcon(type), size: 18, color: _getTypeColor(type)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: isRead ? FontWeight.w500 : FontWeight.w700,
+                          color: isRead ? Colors.grey.shade700 : Colors.black87,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (!isRead)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            LanguageService().translate('notif_new'),
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red.shade700),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Text(_formatTimestamp(timestamp), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
+              ],
+            ),
+            if (body.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                body,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: isRead ? Colors.grey.shade600 : Colors.grey.shade800,
+                  height: 1.4,
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _getTypeColor(type).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _getTypeLabel(type),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: _getTypeColor(type)),
+                  ),
+                ),
+                const Spacer(),
+                if (!isRead)
+                  TextButton(
+                    onPressed: () => _markAsRead(notification['id'], index),
+                    child: Text(
+                      LanguageService().translate('notif_mark_read'),
+                      style: TextStyle(fontSize: 11, color: theme.colorScheme.primary),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

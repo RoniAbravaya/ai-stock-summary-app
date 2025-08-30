@@ -77,6 +77,18 @@ env:
       - BUILD
       - RUNTIME
 
+  # OpenAI
+  - variable: OPENAI_API_KEY
+    secret: openai-api-key
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: OPENAI_MODEL
+    value: "gpt-4o-mini"
+    availability:
+      - RUNTIME
+
 # Health check configuration
 healthCheck:
   initialDelaySeconds: 60

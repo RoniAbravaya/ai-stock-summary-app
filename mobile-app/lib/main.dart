@@ -1318,12 +1318,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   void _removeFromFavorites(BuildContext context, String stockId) async {
     try {
-      final user = FirebaseService().auth.currentUser;
-      if (user != null) {
-        await StockService().removeFromFavorites(user.uid, stockId);
-      } else {
-        await FirebaseService().removeFromFavorites(stockId);
-      }
+      // Use Firestore for real-time sync
+      await FirebaseService().removeFromFavorites(stockId);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Removed from favorites')));

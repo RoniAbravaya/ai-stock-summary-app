@@ -185,11 +185,13 @@ class _StocksScreenState extends State<StocksScreen> {
       final isFavorite = _favoriteSymbols.contains(symbol);
 
       if (isFavorite) {
+        // Use Firestore so Stocks and Favorites stream update instantly
         await FirebaseService().removeFromFavorites(symbol);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Removed $symbol from favorites')),
         );
       } else {
+        // Use Firestore so Stocks and Favorites stream update instantly
         await FirebaseService().addToFavorites(symbol);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Added $symbol to favorites')),

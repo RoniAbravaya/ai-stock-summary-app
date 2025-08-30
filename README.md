@@ -95,3 +95,23 @@ flutter run
 ## License
 
 [Add your license here] 
+
+## Redesign (feature-flag)
+
+The app includes a gated redesign that can be turned on per-device without affecting existing functionality.
+
+- **Enable in app**: Open the Settings/Profile screen and toggle "Use new design". The choice is saved locally and persists across restarts.
+- **What changes when enabled**:
+  - Global theme using Inter typography, updated colors and shapes
+  - Pill-shaped BottomNavigationBar with SafeArea padding and subtle blur (BackdropFilter) on scroll
+  - Redesigned screens: News list, Stocks list, Stock Details (header + actions), Notification Settings, Notification History, Language Settings
+  - Legacy UI is preserved when the toggle is OFF
+- **Under the hood**:
+  - Managed by `FeatureFlagService` with SharedPreferences key `feature_redesign_enabled`
+  - Reactive switching via a stream surrounding `MaterialApp`
+- **Programmatic toggle (for developers)**:
+  - Set at runtime: `await FeatureFlagService().setRedesignEnabled(true);`
+  - Or set the SharedPreferences key `feature_redesign_enabled = true`
+- **Rollback**:
+  - The redesign is fully gated by the toggle; disabling it restores legacy UI.
+  - All changes are on branch `feature/redesign-flag-toggle` to allow safe rollback via Git if needed.

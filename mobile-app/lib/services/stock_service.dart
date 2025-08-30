@@ -240,6 +240,37 @@ class StockService {
     }
   }
 
+  /// Generate AI summary for a ticker
+  Future<String> generateAISummary(String ticker, {String language = 'en'}) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/summary/generate');
+      final response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'stockId': ticker.toUpperCase(), 'language': language}),
+          )
+          .timeout(const Duration(seconds: 45));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final content = (data['data']['content'] ?? '').toString();
+          return content.isNotEmpty ? content : 'No summary generated.';
+        }
+        throw Exception('API returned unsuccessful response: ${data['error'] ?? 'Unknown error'}');
+      } else if (response.statusCode == 501) {
+        final data = json.decode(response.body);
+        throw Exception(data['error'] ?? 'Summary generation not available');
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ StockService: Error generating AI summary: $e');
+      rethrow;
+    }
+  }
+
   /// Test API connectivity
   Future<Map<String, dynamic>> testConnectivity() async {
     try {

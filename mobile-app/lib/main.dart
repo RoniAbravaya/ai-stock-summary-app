@@ -1331,10 +1331,25 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   void _generateAISummary(BuildContext context, String stockId) async {
-    // TODO: Implement AI summary generation via backend API
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('AI Summary generation coming soon...')),
-    );
+    try {
+      final content = await StockService().generateAISummary(stockId);
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('AI Summary — $stockId'),
+          content: SingleChildScrollView(child: Text(content)),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('AI summary failed: $e')),
+      );
+    }
   }
 
   // Simple empty state widget

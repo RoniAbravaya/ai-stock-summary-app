@@ -1117,7 +1117,44 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Favorites')),
-      body: _buildApiFavoritesContent(),
+      body: _buildRealtimeFavorites(),
+    );
+  }
+
+  Widget _buildRealtimeFavorites() {
+    final user = FirebaseService().auth.currentUser;
+    if (user == null) {
+      return const Center(child: Text('Please sign in to view favorites'));
+    }
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseService()
+          .firestore
+          .collection('favorites')
+          .doc(user.uid)
+          .collection('stocks')
+          .orderBy('addedAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Failed to load favorites'));
+        }
+        final docs = snapshot.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return const _EmptyFavorites();
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final symbol = (data['stockId'] as String?) ?? docs[index].id;
+            return _buildFavoriteCard(context, symbol);
+          },
+        );
+      },
     );
   }
 

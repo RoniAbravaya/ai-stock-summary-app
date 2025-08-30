@@ -8,6 +8,7 @@ import '../services/feature_flag_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:async';
 
 class StocksScreen extends StatefulWidget {
   const StocksScreen({super.key, required this.firebaseEnabled});
@@ -25,6 +26,7 @@ class _StocksScreenState extends State<StocksScreen> {
   List<Stock> _mainStocks = [];
   List<StockSearchResult> _searchResults = [];
   List<String> _favoriteSymbols = [];
+  StreamSubscription? _favoritesSub;
   bool _isLoading = true;
   bool _isSearching = false;
   String? _error;
@@ -49,6 +51,7 @@ class _StocksScreenState extends State<StocksScreen> {
         if (user != null) {
           _currentUserId = user.uid;
           await _loadFavorites();
+          _subscribeToFavorites();
         }
       } catch (e) {
         print('⚠️ StocksScreen: Error loading user data: $e');
@@ -60,13 +63,43 @@ class _StocksScreenState extends State<StocksScreen> {
     if (_currentUserId.isEmpty) return;
 
     try {
-      final favorites = await _stockService.getFavorites(_currentUserId);
+      final snapshot = await FirebaseService()
+          .firestore
+          .collection('favorites')
+          .doc(_currentUserId)
+          .collection('stocks')
+          .get();
       setState(() {
-        _favoriteSymbols = favorites.map((f) => f.ticker).toList();
+        _favoriteSymbols = snapshot.docs
+            .map((d) => (d.data()['stockId'] as String?) ?? d.id)
+            .whereType<String>()
+            .toList();
       });
     } catch (e) {
       print('⚠️ StocksScreen: Error loading favorites: $e');
     }
+  }
+
+  void _subscribeToFavorites() {
+    _favoritesSub?.cancel();
+    if (_currentUserId.isEmpty) return;
+    _favoritesSub = FirebaseService()
+        .firestore
+        .collection('favorites')
+        .doc(_currentUserId)
+        .collection('stocks')
+        .snapshots()
+        .listen((snap) {
+      final symbols = snap.docs
+          .map((d) => (d.data()['stockId'] as String?) ?? d.id)
+          .whereType<String>()
+          .toList();
+      if (mounted) {
+        setState(() => _favoriteSymbols = symbols);
+      }
+    }, onError: (e) {
+      print('⚠️ StocksScreen: favorites stream error: $e');
+    });
   }
 
   Future<void> _loadMainStocks() async {
@@ -152,18 +185,12 @@ class _StocksScreenState extends State<StocksScreen> {
       final isFavorite = _favoriteSymbols.contains(symbol);
 
       if (isFavorite) {
-        await _stockService.removeFromFavorites(_currentUserId, symbol);
-        setState(() {
-          _favoriteSymbols.remove(symbol);
-        });
+        await FirebaseService().removeFromFavorites(symbol);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Removed $symbol from favorites')),
         );
       } else {
-        await _stockService.addToFavorites(_currentUserId, symbol);
-        setState(() {
-          _favoriteSymbols.add(symbol);
-        });
+        await FirebaseService().addToFavorites(symbol);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Added $symbol to favorites')),
         );
@@ -632,6 +659,7 @@ class _StocksScreenState extends State<StocksScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _favoritesSub?.cancel();
     super.dispose();
   }
 }

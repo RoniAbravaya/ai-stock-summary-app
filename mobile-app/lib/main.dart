@@ -7,6 +7,8 @@ import 'services/firebase_service.dart';
 import 'services/mock_data_service.dart';
 import 'services/language_service.dart';
 import 'services/feature_flag_service.dart';
+import 'services/stock_service.dart';
+import 'models/stock_models.dart';
 import 'config/app_config.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/language_settings_screen.dart';
@@ -1101,16 +1103,54 @@ class DashboardScreen extends StatelessWidget {
 }
 
 // Favorites Screen - AI Summary and Generate Button
-class FavoritesScreen extends StatelessWidget {
+class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key, required this.firebaseEnabled});
 
   final bool firebaseEnabled;
 
   @override
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Favorites')),
-      body: _buildFirebaseContent(),
+      body: _buildApiFavoritesContent(),
+    );
+  }
+
+  Widget _buildApiFavoritesContent() {
+    final user = FirebaseService().auth.currentUser;
+    if (user == null) {
+      return const Center(child: Text('Please sign in to view favorites'));
+    }
+    return RefreshIndicator(
+      onRefresh: () async { if (mounted) setState(() {}); },
+      child: FutureBuilder<List<Stock>>(
+        future: StockService().getFavoriteStocks(user.uid),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Failed to load favorites: ${snapshot.error}'));
+          }
+          final stocks = snapshot.data ?? [];
+          if (stocks.isEmpty) {
+            return const _EmptyFavorites();
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: stocks.length,
+            itemBuilder: (context, index) {
+              final stock = stocks[index];
+              return _buildFavoriteCard(context, stock.symbol);
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -1189,7 +1229,7 @@ class FavoritesScreen extends StatelessWidget {
   }
 
   Widget _buildSummaryContent(String stockId) {
-    if (firebaseEnabled) {
+    if (FirebaseService().isFirestoreAvailable) {
       return FutureBuilder<DocumentSnapshot>(
         future: FirebaseService().getStockSummary(stockId),
         builder: (context, summarySnapshot) {
@@ -1206,24 +1246,15 @@ class FavoritesScreen extends StatelessWidget {
               print('❌ Error parsing summary data: $e');
             }
           }
-          return _buildMockSummaryContent(stockId);
+          return const Text('No summary generated yet');
         },
       );
-    } else {
-      return _buildMockSummaryContent(stockId);
     }
+    return const Text('No summary generated yet');
   }
 
   Widget _buildMockSummaryContent(String stockId) {
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: MockDataService().getSummary(stockId),
-      builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data != null) {
-          return _buildSummaryContainer(snapshot.data!['content']);
-        }
-        return const Text('No summary generated yet');
-      },
-    );
+    return const Text('No summary generated yet');
   }
 
   Widget _buildSummaryContainer(String content) {
@@ -1250,7 +1281,10 @@ class FavoritesScreen extends StatelessWidget {
 
   void _removeFromFavorites(BuildContext context, String stockId) async {
     try {
-      if (firebaseEnabled) {
+      final user = FirebaseService().auth.currentUser;
+      if (user != null) {
+        await StockService().removeFromFavorites(user.uid, stockId);
+      } else {
         await FirebaseService().removeFromFavorites(stockId);
       }
       ScaffoldMessenger.of(

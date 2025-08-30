@@ -969,7 +969,7 @@ class DashboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: firebaseEnabled ? _buildFirebaseContent() : _buildMockContent(),
+      body: _buildFirebaseContent(),
     );
   }
 
@@ -982,11 +982,11 @@ class DashboardScreen extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
-          return _buildMockContent(); // Fallback to mock data
+          return const _EmptyFavorites();
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildMockContent(); // Fallback to mock data
+          return const _EmptyFavorites();
         }
 
         return ListView.builder(
@@ -1110,7 +1110,7 @@ class FavoritesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Favorites')),
-      body: firebaseEnabled ? _buildFirebaseContent() : _buildMockContent(),
+      body: _buildFirebaseContent(),
     );
   }
 
@@ -1123,11 +1123,11 @@ class FavoritesScreen extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
-          return _buildMockContent(); // Fallback to mock data
+          return const _EmptyFavorites();
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildMockContent(); // Fallback to mock data
+          return const _EmptyFavorites();
         }
 
         return ListView.builder(
@@ -1145,40 +1145,7 @@ class FavoritesScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMockContent() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: MockDataService().getFavorites(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.favorite_border, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text('No favorites yet', style: TextStyle(fontSize: 18)),
-                SizedBox(height: 8),
-                Text('Add stocks from Dashboard to generate AI summaries'),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.length,
-          itemBuilder: (context, index) {
-            final favorite = snapshot.data![index];
-            return _buildFavoriteCard(context, favorite['stockId']);
-          },
-        );
-      },
-    );
-  }
+  // Mock content removed; we now rely on Firestore favorites only
 
   Widget _buildFavoriteCard(BuildContext context, String stockId) {
     return Card(
@@ -1300,6 +1267,27 @@ class FavoritesScreen extends StatelessWidget {
     // TODO: Implement AI summary generation via backend API
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('AI Summary generation coming soon...')),
+    );
+  }
+
+  // Simple empty state widget
+}
+
+class _EmptyFavorites extends StatelessWidget {
+  const _EmptyFavorites();
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(Icons.favorite_border, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('No favorites yet', style: TextStyle(fontSize: 18)),
+          SizedBox(height: 8),
+          Text('Add stocks from Stocks to build your list'),
+        ],
+      ),
     );
   }
 }

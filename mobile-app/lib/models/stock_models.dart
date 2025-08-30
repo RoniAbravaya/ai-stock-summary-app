@@ -330,7 +330,7 @@ class StockFavorite {
 
   factory StockFavorite.fromJson(Map<String, dynamic> json) {
     return StockFavorite(
-      ticker: json['ticker'] ?? '',
+      ticker: (json['ticker'] ?? json['symbol'] ?? '').toString(),
       addedAt: DateTime.fromMillisecondsSinceEpoch(
         json['addedAt'] ?? DateTime.now().millisecondsSinceEpoch,
       ),

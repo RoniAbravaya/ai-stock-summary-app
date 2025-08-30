@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/language_service.dart';
 import '../config/app_config.dart';
+import '../services/feature_flag_service.dart';
 
 /// Language Settings Screen
 /// Allows users to select their preferred language from supported options
@@ -31,16 +32,14 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final redesign = FeatureFlagService().redesignEnabled;
     return Scaffold(
       appBar: AppBar(
         title: Text(_languageService.translate('settings_language')),
-        backgroundColor: Color(AppConfig.primaryBlue),
-        foregroundColor: Colors.white,
       ),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _buildLanguageList(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : (redesign ? _buildRedesignedList() : _buildLanguageList()),
     );
   }
 
@@ -119,6 +118,99 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
         const SizedBox(height: 24),
 
         // Current Language Info
+        _buildCurrentLanguageInfo(),
+      ],
+    );
+  }
+
+  Widget _buildRedesignedList() {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Header container
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.language, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _languageService.translate('settings_language'),
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      _languageService.translate('settings_language_desc'),
+                      style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Options container
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(Icons.translate, color: Colors.grey.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Available Languages',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              ...LanguageService.supportedLanguages.entries.map(
+                (entry) => _buildLanguageOption(entry.key, entry.value),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 24),
         _buildCurrentLanguageInfo(),
       ],
     );

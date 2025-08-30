@@ -6,12 +6,15 @@ import 'firebase_options.dart';
 import 'services/firebase_service.dart';
 import 'services/mock_data_service.dart';
 import 'services/language_service.dart';
+import 'services/feature_flag_service.dart';
 import 'config/app_config.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/language_settings_screen.dart';
 import 'screens/notification_settings_screen.dart';
 import 'screens/news_screen.dart';
 import 'screens/stocks_screen.dart';
 import 'dart:async';
+import 'dart:ui' as ui;
 
 // Top-level function to handle background messages
 @pragma('vm:entry-point')
@@ -70,6 +73,14 @@ void main() async {
     print('⚠️ Language service initialization failed: $e');
   }
 
+  // Initialize Feature Flags (redesign default OFF, persisted)
+  try {
+    await FeatureFlagService().initialize();
+    print('✅ Feature flags initialized (redesign=${FeatureFlagService().redesignEnabled})');
+  } catch (e) {
+    print('⚠️ Feature flags initialization failed: $e');
+  }
+
   runApp(AIStockSummaryApp(firebaseEnabled: firebaseInitialized));
 }
 
@@ -85,6 +96,7 @@ class AIStockSummaryApp extends StatefulWidget {
 class _AIStockSummaryAppState extends State<AIStockSummaryApp> {
   final LanguageService _languageService = LanguageService();
   late StreamController<String> _languageStreamController;
+  final FeatureFlagService _featureFlags = FeatureFlagService();
 
   @override
   void initState() {
@@ -103,51 +115,197 @@ class _AIStockSummaryAppState extends State<AIStockSummaryApp> {
     return StreamBuilder<String>(
       stream: _languageStreamController.stream,
       initialData: _languageService.currentLanguage,
-      builder: (context, snapshot) {
-        return MaterialApp(
-          title: _languageService.translate('app_name'),
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Color(AppConfig.primaryBlue),
-              brightness: Brightness.light,
-            ),
-            useMaterial3: true,
-            fontFamily: AppTextStyles.fontFamily,
-            appBarTheme: AppBarTheme(
-              centerTitle: true,
-              elevation: 0,
-              backgroundColor: Color(AppConfig.primaryBlue),
-              foregroundColor: Colors.white,
-            ),
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(AppConfig.primaryBlue),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+      builder: (context, langSnap) {
+        return StreamBuilder<bool>(
+          stream: _featureFlags.redesignStream,
+          initialData: _featureFlags.redesignEnabled,
+          builder: (context, flagSnap) {
+            final bool redesign = flagSnap.data ?? false;
+            final ThemeData lightTheme = redesign
+                ? _buildRedesignLightTheme()
+                : ThemeData(
+                    colorScheme: ColorScheme.fromSeed(
+                      seedColor: Color(AppConfig.primaryBlue),
+                      brightness: Brightness.light,
+                    ),
+                    useMaterial3: true,
+                    fontFamily: AppTextStyles.fontFamily,
+                    appBarTheme: const AppBarTheme(
+                      centerTitle: true,
+                      elevation: 0,
+                      backgroundColor: Color(AppConfig.primaryBlue),
+                      foregroundColor: Colors.white,
+                    ),
+                    elevatedButtonTheme: ElevatedButtonThemeData(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(AppConfig.primaryBlue),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  );
+
+            final ThemeData darkTheme = redesign
+                ? _buildRedesignDarkTheme()
+                : ThemeData(
+                    colorScheme: ColorScheme.fromSeed(
+                      seedColor: Color(AppConfig.primaryBlue),
+                      brightness: Brightness.dark,
+                    ),
+                    useMaterial3: true,
+                    fontFamily: AppTextStyles.fontFamily,
+                  );
+
+            return MaterialApp(
+              title: _languageService.translate('app_name'),
+              theme: lightTheme,
+              darkTheme: darkTheme,
+              debugShowCheckedModeBanner: AppConfig.isDevelopment,
+              home: AuthWrapper(
+                firebaseEnabled: widget.firebaseEnabled,
+                onLanguageChanged: () {
+                  _languageStreamController
+                      .add(_languageService.currentLanguage);
+                },
               ),
-            ),
-          ),
-          darkTheme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Color(AppConfig.primaryBlue),
-              brightness: Brightness.dark,
-            ),
-            useMaterial3: true,
-            fontFamily: AppTextStyles.fontFamily,
-          ),
-          debugShowCheckedModeBanner: AppConfig.isDevelopment,
-          home: AuthWrapper(
-            firebaseEnabled: widget.firebaseEnabled,
-            onLanguageChanged: () {
-              _languageStreamController.add(_languageService.currentLanguage);
-            },
-          ),
+            );
+          },
         );
       },
     );
   }
+}
+
+ThemeData _buildRedesignLightTheme() {
+  // Minimal lift from example theme to avoid importing its tree
+  // Colors reflect professional blue and light surfaces
+  const primary = Color(0xFF1B365D);
+  const secondary = Color(0xFFFF6B35);
+  const surface = Colors.white;
+  const background = Color(0xFFFAFBFC);
+
+  return ThemeData(
+    brightness: Brightness.light,
+    colorScheme: const ColorScheme.light(
+      primary: primary,
+      secondary: secondary,
+      surface: surface,
+      background: background,
+      error: Color(0xFFEF4444),
+    ),
+    scaffoldBackgroundColor: background,
+    cardTheme: CardThemeData(
+      color: surface,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: surface,
+      foregroundColor: const Color(0xFF1F2937),
+      elevation: 0,
+      centerTitle: true,
+      titleTextStyle: GoogleFonts.inter(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: const Color(0xFF1F2937),
+      ),
+    ),
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      backgroundColor: surface,
+      selectedItemColor: primary,
+      unselectedItemColor: const Color(0xFF6B7280),
+      type: BottomNavigationBarType.fixed,
+      elevation: 8,
+      selectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+      unselectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        elevation: 2,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: primary,
+        side: const BorderSide(color: primary, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      ),
+    ),
+    useMaterial3: true,
+    fontFamily: AppTextStyles.fontFamily,
+  );
+}
+
+ThemeData _buildRedesignDarkTheme() {
+  const primary = Color(0xFF4A90E2);
+  const secondary = Color(0xFFFF6B35);
+  const surface = Color(0xFF1E293B);
+  const background = Color(0xFF0F172A);
+
+  return ThemeData(
+    brightness: Brightness.dark,
+    colorScheme: const ColorScheme.dark(
+      primary: primary,
+      secondary: secondary,
+      surface: surface,
+      background: background,
+      error: Color(0xFFEF4444),
+    ),
+    scaffoldBackgroundColor: background,
+    cardTheme: CardThemeData(
+      color: surface,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: surface,
+      foregroundColor: const Color(0xFFF8FAFC),
+      elevation: 0,
+      centerTitle: true,
+      titleTextStyle: GoogleFonts.inter(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: const Color(0xFFF8FAFC),
+      ),
+    ),
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      backgroundColor: surface,
+      selectedItemColor: primary,
+      unselectedItemColor: const Color(0xFFCBD5E1),
+      type: BottomNavigationBarType.fixed,
+      elevation: 8,
+      selectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+      unselectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        elevation: 2,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: primary,
+        side: const BorderSide(color: primary, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      ),
+    ),
+    useMaterial3: true,
+    fontFamily: AppTextStyles.fontFamily,
+  );
 }
 
 class AuthWrapper extends StatelessWidget {
@@ -724,14 +882,57 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Color(AppConfig.primaryBlue),
-        unselectedItemColor: Color(AppConfig.textLight),
-        items: _navItems,
-      ),
+      bottomNavigationBar: FeatureFlagService().redesignEnabled
+          ? SafeArea(
+              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Stack(
+                  children: [
+                    // Subtle blur backdrop
+                    Positioned.fill(
+                      child: BackdropFilter(
+                        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: const SizedBox.shrink(),
+                      ),
+                    ),
+                    // Pill container with shadow
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                                .bottomNavigationBarTheme
+                                .backgroundColor ??
+                            Theme.of(context).colorScheme.surface.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: BottomNavigationBar(
+                        currentIndex: _currentIndex,
+                        onTap: (index) => setState(() => _currentIndex = index),
+                        type: BottomNavigationBarType.fixed,
+                        backgroundColor: Colors.transparent,
+                        elevation: 0,
+                        items: _navItems,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : BottomNavigationBar(
+              currentIndex: _currentIndex,
+              onTap: (index) => setState(() => _currentIndex = index),
+              type: BottomNavigationBarType.fixed,
+              selectedItemColor: Color(AppConfig.primaryBlue),
+              unselectedItemColor: Color(AppConfig.textLight),
+              items: _navItems,
+            ),
     );
   }
 }
@@ -1472,58 +1673,142 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         const SizedBox(height: 16),
 
-        // Settings Card
-        Card(
-          child: Column(
-            children: [
-              _buildSettingsTile(
-                context: context,
-                icon: Icons.notifications,
-                title: LanguageService().translate('settings_notifications'),
-                subtitle: LanguageService().translate(
-                  'settings_notifications_desc',
+        // Settings (feature-flagged styling)
+        FeatureFlagService().redesignEnabled
+            ? Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                onTap: () => _openNotificationSettings(context),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      value: FeatureFlagService().redesignEnabled,
+                      onChanged: (enabled) async {
+                        await FeatureFlagService().setRedesignEnabled(enabled);
+                        if (mounted) setState(() {});
+                      },
+                      title: const Text('Use new design'),
+                      subtitle: const Text('Toggle the redesigned theme'),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: _settingsIcon(context, Icons.notifications),
+                      title: Text(LanguageService().translate('settings_notifications')),
+                      subtitle: Text(LanguageService().translate('settings_notifications_desc')),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openNotificationSettings(context),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: _settingsIcon(context, Icons.language),
+                      title: Text(LanguageService().translate('settings_language')),
+                      subtitle: Text(LanguageService().translate('settings_language_desc')),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openLanguageSettings(context),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: _settingsIcon(context, Icons.help_outline),
+                      title: Text(LanguageService().translate('settings_help')),
+                      subtitle: Text(LanguageService().translate('settings_help_desc')),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openHelpSupport(context),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: _settingsIcon(context, Icons.privacy_tip_outlined),
+                      title: Text(LanguageService().translate('settings_privacy')),
+                      subtitle: Text(LanguageService().translate('settings_privacy_desc')),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openPrivacyPolicy(context),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: _settingsIcon(context, Icons.logout, color: Colors.red),
+                      title: Text(
+                        LanguageService().translate('auth_sign_out'),
+                        style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        widget.firebaseEnabled
+                            ? LanguageService().translate('settings_sign_out_desc')
+                            : LanguageService().translate('settings_demo_sign_out'),
+                      ),
+                      onTap: () => _signOut(context),
+                    ),
+                  ],
+                ),
+              )
+            : Card(
+                child: Column(
+                  children: [
+                    // Redesign toggle (visible even in legacy style)
+                    SwitchListTile(
+                      value: FeatureFlagService().redesignEnabled,
+                      onChanged: (enabled) async {
+                        await FeatureFlagService().setRedesignEnabled(enabled);
+                        if (mounted) setState(() {});
+                      },
+                      title: const Text('Use new design'),
+                      subtitle: const Text('Toggle the redesigned theme'),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.notifications,
+                      title: LanguageService().translate('settings_notifications'),
+                      subtitle: LanguageService().translate(
+                        'settings_notifications_desc',
+                      ),
+                      onTap: () => _openNotificationSettings(context),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.language,
+                      title: LanguageService().translate('settings_language'),
+                      subtitle: LanguageService().translate('settings_language_desc'),
+                      onTap: () => _openLanguageSettings(context),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.help_outline,
+                      title: LanguageService().translate('settings_help'),
+                      subtitle: LanguageService().translate('settings_help_desc'),
+                      onTap: () => _openHelpSupport(context),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.privacy_tip_outlined,
+                      title: LanguageService().translate('settings_privacy'),
+                      subtitle: LanguageService().translate('settings_privacy_desc'),
+                      onTap: () => _openPrivacyPolicy(context),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingsTile(
+                      context: context,
+                      icon: Icons.logout,
+                      title: LanguageService().translate('auth_sign_out'),
+                      subtitle: widget.firebaseEnabled
+                          ? LanguageService().translate('settings_sign_out_desc')
+                          : LanguageService().translate('settings_demo_sign_out'),
+                      titleColor: Colors.red,
+                      iconColor: Colors.red,
+                      onTap: () => _signOut(context),
+                    ),
+                  ],
+                ),
               ),
-              const Divider(height: 1),
-              _buildSettingsTile(
-                context: context,
-                icon: Icons.language,
-                title: LanguageService().translate('settings_language'),
-                subtitle: LanguageService().translate('settings_language_desc'),
-                onTap: () => _openLanguageSettings(context),
-              ),
-              const Divider(height: 1),
-              _buildSettingsTile(
-                context: context,
-                icon: Icons.help_outline,
-                title: LanguageService().translate('settings_help'),
-                subtitle: LanguageService().translate('settings_help_desc'),
-                onTap: () => _openHelpSupport(context),
-              ),
-              const Divider(height: 1),
-              _buildSettingsTile(
-                context: context,
-                icon: Icons.privacy_tip_outlined,
-                title: LanguageService().translate('settings_privacy'),
-                subtitle: LanguageService().translate('settings_privacy_desc'),
-                onTap: () => _openPrivacyPolicy(context),
-              ),
-              const Divider(height: 1),
-              _buildSettingsTile(
-                context: context,
-                icon: Icons.logout,
-                title: LanguageService().translate('auth_sign_out'),
-                subtitle: widget.firebaseEnabled
-                    ? LanguageService().translate('settings_sign_out_desc')
-                    : LanguageService().translate('settings_demo_sign_out'),
-                titleColor: Colors.red,
-                iconColor: Colors.red,
-                onTap: () => _signOut(context),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -1563,6 +1848,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
+    );
+  }
+
+  Widget _settingsIcon(BuildContext context, IconData icon, {Color? color}) {
+    final bg = (color ?? Theme.of(context).colorScheme.primary).withOpacity(0.1);
+    final fg = color ?? Theme.of(context).colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, color: fg),
     );
   }
 

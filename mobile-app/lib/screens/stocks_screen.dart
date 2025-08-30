@@ -4,6 +4,9 @@ import '../services/firebase_service.dart';
 import '../config/app_config.dart';
 import '../models/stock_models.dart';
 import '../widgets/environment_switcher.dart';
+import '../services/feature_flag_service.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class StocksScreen extends StatefulWidget {
   const StocksScreen({super.key, required this.firebaseEnabled});
@@ -365,44 +368,123 @@ class _StocksScreenState extends State<StocksScreen> {
   Widget _buildStockCard(Stock stock) {
     final isFavorite = _favoriteSymbols.contains(stock.symbol);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Color(AppConfig.primaryBlue),
-          child: Text(
-            stock.symbol.substring(0, stock.symbol.length > 2 ? 2 : 1),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+    final bool redesign = FeatureFlagService().redesignEnabled;
+    if (!redesign) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Color(AppConfig.primaryBlue),
+            child: Text(
+              stock.symbol.substring(0, stock.symbol.length > 2 ? 2 : 1),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-        ),
-        title: Text(
-          stock.symbol,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(stock.name),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              stock.formattedPrice,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            Text(
-              '${stock.formattedChange} (${stock.formattedChangePercent})',
-              style: TextStyle(
-                color: stock.isPositiveChange ? Colors.green : Colors.red,
-                fontWeight: FontWeight.w500,
+          title: Text(
+            stock.symbol,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Text(stock.name),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                stock.formattedPrice,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
+              Text(
+                '${stock.formattedChange} (${stock.formattedChangePercent})',
+                style: TextStyle(
+                  color: stock.isPositiveChange ? Colors.green : Colors.red,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          onTap: () {},
+        ),
+      );
+    }
+
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () {},
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        onTap: () {
-          // TODO: Navigate to stock details
-        },
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: theme.colorScheme.primary,
+              child: Text(
+                stock.symbol.substring(0, stock.symbol.length > 2 ? 2 : 1),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    stock.symbol,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    stock.name,
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  stock.formattedPrice,
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  '${stock.formattedChange} (${stock.formattedChangePercent})',
+                  style: TextStyle(
+                    color: stock.isPositiveChange ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: Icon(
+                isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: isFavorite ? Colors.red : Colors.grey,
+              ),
+              onPressed: () => _toggleFavorite(stock.symbol),
+            )
+          ],
+        ),
       ),
     );
   }
@@ -566,25 +648,216 @@ class StockDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool redesign = FeatureFlagService().redesignEnabled;
+
+    if (!redesign) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('$symbol Details'),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.info_outline, size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text(
+                'Stock Details for $symbol',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('Detailed view coming soon...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Redesigned details screen (header + placeholders)
     return Scaffold(
       appBar: AppBar(
-        title: Text('$symbol Details'),
+        title: Text(symbol),
       ),
-      body: Center(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.info_outline, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Stock Details for $symbol',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            // Header card
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: theme.colorScheme.primary,
+                    child: Text(
+                      symbol.substring(0, symbol.length > 2 ? 2 : 1),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          symbol,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'Company name • Sector',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.grey.shade700,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Add to favorites',
+                        icon: const Icon(Icons.favorite_border),
+                        onPressed: () => _addToFavorites(context, symbol),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
-            const Text('Detailed view coming soon...'),
+
+            const SizedBox(height: 16),
+
+            // Chart placeholder
+            Container(
+              height: 220,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.show_chart, size: 48, color: Colors.grey.shade400),
+                    const SizedBox(height: 8),
+                    Text('Chart coming soon', style: TextStyle(color: Colors.grey.shade600)),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // AI Summary placeholder
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('AI Summary', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'An AI-generated summary for $symbol will appear here, highlighting key trends, recent news, and potential risks.',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Actions row
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _shareSymbol(symbol),
+                  icon: const Icon(Icons.ios_share),
+                  label: const Text('Share'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _openInBrowser(symbol),
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Open'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+Future<void> _shareSymbol(String symbol) async {
+  try {
+    await Share.share('Check $symbol in AI Stock Summary');
+  } catch (_) {}
+}
+
+Future<void> _openInBrowser(String symbol) async {
+  final url = Uri.parse('https://finance.yahoo.com/quote/$symbol');
+  try {
+    await launchUrl(url, mode: LaunchMode.externalApplication);
+  } catch (_) {}
+}
+
+Future<void> _addToFavorites(BuildContext context, String symbol) async {
+  try {
+    final user = FirebaseService().auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to manage favorites')),
+      );
+      return;
+    }
+
+    await StockService().addToFavorites(user.uid, symbol);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Added $symbol to favorites')),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: $e')),
     );
   }
 }

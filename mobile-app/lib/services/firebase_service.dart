@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -15,7 +16,10 @@ class FirebaseService {
 
   // Firebase instances
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(
+    app: Firebase.app(),
+    databaseId: 'flutter-database',
+  );
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
@@ -777,8 +781,32 @@ class FirebaseService {
   /// Check if user is admin
   Future<bool> isUserAdmin() async {
     try {
-      IdTokenResult tokenResult = await currentUser!.getIdTokenResult();
-      return tokenResult.claims?['admin'] == true;
+      if (currentUser == null) return false;
+
+      // Prefer checking the user document role which aligns with Firestore rules
+      final doc = await _firestore
+          .collection('users')
+          .doc(currentUser!.uid)
+          .get()
+          .timeout(const Duration(seconds: 3));
+
+      final data = doc.data() as Map<String, dynamic>?;
+      if (data != null && (data['role'] as String?)?.toLowerCase() == 'admin') {
+        return true;
+      }
+
+      // Fallback to token custom claims if available
+      try {
+        final tokenResult = await currentUser!.getIdTokenResult();
+        if (tokenResult.claims?['admin'] == true) return true;
+      } catch (_) {}
+
+      // Last resort: specific email is treated as admin
+      if ((currentUser!.email ?? '').toLowerCase() == 'erolrony91@gmail.com') {
+        return true;
+      }
+
+      return false;
     } catch (e) {
       return false;
     }

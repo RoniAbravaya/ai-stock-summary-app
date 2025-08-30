@@ -51,9 +51,10 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCbnJWJg7btLbIYKPqzKdfvNmVSwx-Sikw',
-    appId: 'new-flutter-ai',
+    appId: '1:492701567937:android:322a5455316d850c913d40',
     messagingSenderId: '492701567937',
     projectId: 'new-flutter-ai',
+    databaseURL: 'https://new-flutter-ai-default-rtdb.firebaseio.com',
     storageBucket: 'new-flutter-ai.firebasestorage.app',
   );
 

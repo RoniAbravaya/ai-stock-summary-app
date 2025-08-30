@@ -1,6 +1,5 @@
 {
   "projects": {
-    "default": "new-flutter-ai",
     "prod": "new-flutter-ai"
   },
   "targets": {},

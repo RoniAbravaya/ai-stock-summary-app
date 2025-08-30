@@ -2,79 +2,94 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read/write their own user document
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Public health-check document to allow app to verify connectivity pre-auth
+    match /_health/check {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Users can read/write their own user document; admins can access all users
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      // Allow Cloud Functions to read user documents for FCM tokens
-      allow read: if request.auth.token.admin == true;
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
     }
     
-    // All authenticated users can read stocks and news
+    // All authenticated users can read stocks and news; only admins can write
     match /stocks/{stockId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        resource.data.keys().hasAll(['symbol', 'name', 'price']) &&
-        request.auth.token.admin == true;
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
     
     match /news/{newsId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
     
-    // AI Summaries - users can read summaries, only system can write
+    // AI Summaries - users can read summaries, only admins/system can write
     match /summaries/{summaryId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
     
-    // User favorites - users can manage their own favorites
+    // User favorites - users can manage their own favorites, including subcollections
     match /favorites/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
+      match /{document=**} {
+        allow read, write: if isOwner(userId);
+      }
     }
     
-    // Subscriptions - users can read their own, admins can read all
+    // Subscriptions - users can read their own, admins can read/write all
     match /subscriptions/{userId} {
-      allow read: if request.auth != null && 
-        (request.auth.uid == userId || request.auth.token.admin == true);
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
     }
     
-    // Usage tracking - users can read their own usage
+    // Usage tracking - users can read their own usage; admins can manage
     match /usage/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow read: if isOwner(userId);
+      allow write: if isAdmin();
     }
     
     // Admin-only collections
     match /admin/{document=**} {
-      allow read, write: if request.auth != null && request.auth.token.admin == true;
+      allow read, write: if isAdmin();
     }
     
-    // Admin notifications - for Cloud Functions processing
+    // Admin notifications - admins create/read/update; others denied
     match /admin_notifications/{notificationId} {
-      // Admins can create notifications
-      allow create: if request.auth != null && request.auth.token.admin == true;
-      // Cloud Functions can read and update (no auth required for functions)
-      allow read, update: if true;
-      // Admins can read their own notifications
-      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow create: if isAdmin();
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
     }
     
     // Push notification tokens
     match /fcmTokens/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
     }
 
     // User notification history
     match /user_notifications/{userId}/notifications/{notificationId} {
-      // Users can read their own notification history
-      allow read: if request.auth != null && request.auth.uid == userId;
+      // Users (and admins) can read their own notification history
+      allow read: if isOwner(userId) || isAdmin();
       // Users can update read status of their own notifications
-      allow update: if request.auth != null && request.auth.uid == userId &&
+      allow update: if isOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-      // Cloud Functions can create notification history (no auth required for functions)
-      allow create: if true;
+      // Allow creation by the user or admin services
+      allow create: if isOwner(userId) || isAdmin();
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../config/app_config.dart';
 import '../services/firebase_service.dart';
 import '../services/language_service.dart';
@@ -491,7 +492,8 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
     final user = FirebaseService().currentUser;
     if (user == null) return;
 
-    Query query = FirebaseFirestore.instance
+    Query query = FirebaseFirestore.instanceFor(
+            app: Firebase.app(), databaseId: 'flutter-database')
         .collection('user_notifications')
         .doc(user.uid)
         .collection('notifications')
@@ -526,7 +528,8 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
       final user = FirebaseService().currentUser;
       if (user == null) return;
 
-      final query = FirebaseFirestore.instance
+      final query = FirebaseFirestore.instanceFor(
+              app: Firebase.app(), databaseId: 'flutter-database')
           .collection('user_notifications')
           .doc(user.uid)
           .collection('notifications')
@@ -604,7 +607,8 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
       final user = FirebaseService().currentUser;
       if (user == null) return;
 
-      await FirebaseFirestore.instance
+      await FirebaseFirestore.instanceFor(
+              app: Firebase.app(), databaseId: 'flutter-database')
           .collection('user_notifications')
           .doc(user.uid)
           .collection('notifications')

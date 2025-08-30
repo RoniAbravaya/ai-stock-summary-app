@@ -8,6 +8,7 @@ const router = express.Router();
 const newsCacheService = require('../services/newsCacheService');
 const yahooFinanceService = require('../services/yahooFinanceService');
 const mockData = require('../services/mockData');
+const schedulerService = require('../services/schedulerService');
 
 // GET /api/news - Get general news (trending stocks news)
 router.get('/', async (req, res) => {
@@ -28,7 +29,60 @@ router.get('/', async (req, res) => {
     
     // Get news for trending tickers
     const trendingTickers = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'JPM'];
-    const result = await newsCacheService.getNewsForTickers(trendingTickers);
+
+    // Freshness controls
+    const forceFresh = (req.query.fresh || '').toString().toLowerCase() === 'true' || req.query.fresh === '1';
+    const noCache = (req.query.nocache || '').toString().toLowerCase() === 'true' || req.query.nocache === '1';
+    const maxAgeHours = Number.isFinite(parseFloat(req.query.maxAgeHours))
+      ? Math.max(1, parseFloat(req.query.maxAgeHours))
+      : 6; // default to 6 hours
+
+    let result = await newsCacheService.getNewsForTickers(trendingTickers);
+
+    // Determine stale or missing tickers
+    const staleTickers = [];
+    if (result && result.results) {
+      for (const ticker of trendingTickers) {
+        const r = result.results[ticker];
+        const isMissing = !r || r.success === false || !Array.isArray(r.articles) || r.articles.length === 0;
+        const isStale = r && typeof r.cacheAge === 'number' && r.cacheAge >= maxAgeHours;
+        if (forceFresh || noCache || isMissing || isStale) {
+          staleTickers.push(ticker);
+        }
+      }
+    }
+
+    // If needed, refresh stale/missing tickers
+    let fallbackUsed = false;
+    let stillStaleOrMissing = [];
+    if (staleTickers.length > 0) {
+      console.log(`♻️ Refreshing stale/missing tickers: ${staleTickers.join(', ')} (maxAgeHours=${maxAgeHours}, forceFresh=${forceFresh}, noCache=${noCache})`);
+      await Promise.allSettled(staleTickers.map(t => schedulerService.refreshTickerNews(t)));
+      // Re-read after refresh
+      result = await newsCacheService.getNewsForTickers(trendingTickers);
+
+      // Determine if anything is still stale or missing, then fall back to direct fetch + store
+      for (const ticker of staleTickers) {
+        const r = result.results ? result.results[ticker] : null;
+        const missing = !r || r.success === false || !Array.isArray(r.articles) || r.articles.length === 0;
+        const stale = r && typeof r.cacheAge === 'number' && r.cacheAge >= maxAgeHours;
+        if (missing || stale) stillStaleOrMissing.push(ticker);
+      }
+
+      if (stillStaleOrMissing.length > 0) {
+        console.log(`🆘 Scheduler refresh insufficient. Falling back to direct fetch for: ${stillStaleOrMissing.join(', ')}`);
+        try {
+          const fetchResults = await yahooFinanceService.fetchNewsForMultipleTickers(stillStaleOrMissing, 800);
+          const toStore = fetchResults.filter(r => r && r.success && Array.isArray(r.data) && r.data.length > 0);
+          await Promise.allSettled(toStore.map(r => newsCacheService.storeNewsForTicker(r.ticker, r.data)));
+          fallbackUsed = true;
+          // Re-read after fallback store
+          result = await newsCacheService.getNewsForTickers(trendingTickers);
+        } catch (fallbackErr) {
+          console.error('❌ Direct fetch fallback failed:', fallbackErr.message);
+        }
+      }
+    }
     
     if (result.success) {
       // Combine all articles from all tickers
@@ -43,25 +97,42 @@ router.get('/', async (req, res) => {
           });
         }
       });
-      
+
+      // Helper to parse various date fields
+      const parseDate = (a) => {
+        const candidates = [a.published_date, a.publishedAt, a.pubDate, a.date, a.time, a.cached_at];
+        for (const c of candidates) {
+          if (c) {
+            const d = new Date(c);
+            if (!isNaN(d.getTime())) return d;
+          }
+        }
+        return new Date(0);
+      };
+
       // Sort by published date (most recent first)
-      allArticles.sort((a, b) => {
-        const dateA = new Date(a.published_date || a.publishedAt || 0);
-        const dateB = new Date(b.published_date || b.publishedAt || 0);
-        return dateB - dateA;
-      });
-      
+      allArticles.sort((a, b) => parseDate(b) - parseDate(a));
+
+      // Optionally filter out very old items (> 30 days) to avoid stale content
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const nowMs = Date.now();
+      const freshArticles = allArticles.filter(a => nowMs - parseDate(a).getTime() <= thirtyDaysMs);
+
       // Limit to top 20 articles
-      const limitedArticles = allArticles.slice(0, 20);
+      const limitedArticles = (freshArticles.length > 0 ? freshArticles : allArticles).slice(0, 20);
       
       console.log(`✅ Successfully fetched ${limitedArticles.length} news articles`);
       res.json({
         success: true,
         data: limitedArticles,
-        totalTickers: trendingTickers.length,
+        totalTickers: Object.keys(result.results || {}).length,
         totalArticles: allArticles.length,
         returnedArticles: limitedArticles.length,
         source: 'cache_and_api',
+        refreshedTickers: staleTickers || [],
+        fallbackUsed,
+        stillStaleOrMissing,
+        freshness: { maxAgeHours, forceFresh, noCache },
         timestamp: new Date().toISOString()
       });
     } else {
@@ -103,7 +174,21 @@ router.get('/stock/:ticker', async (req, res) => {
       });
     }
     
-    const result = await newsCacheService.getNewsForTickers([ticker]);
+    const forceFresh = (req.query.fresh || '').toString().toLowerCase() === 'true' || req.query.fresh === '1';
+    const maxAgeHours = Number.isFinite(parseFloat(req.query.maxAgeHours))
+      ? Math.max(1, parseFloat(req.query.maxAgeHours))
+      : 6;
+
+    let result = await newsCacheService.getNewsForTickers([ticker]);
+
+    const r = result.results ? result.results[ticker] : null;
+    const isMissing = !r || r.success === false || !Array.isArray(r.articles) || r.articles.length === 0;
+    const isStale = r && typeof r.cacheAge === 'number' && r.cacheAge >= maxAgeHours;
+    if (forceFresh || isMissing || isStale) {
+      console.log(`♻️ Refreshing ${ticker} (maxAgeHours=${maxAgeHours}, forceFresh=${forceFresh})`);
+      await schedulerService.refreshTickerNews(ticker);
+      result = await newsCacheService.getNewsForTickers([ticker]);
+    }
     
     if (result.success && result.results[ticker]) {
       const tickerResult = result.results[ticker];
@@ -118,6 +203,7 @@ router.get('/stock/:ticker', async (req, res) => {
           lastUpdated: tickerResult.lastUpdated,
           cacheAge: tickerResult.cacheAge,
           source: tickerResult.freshlyFetched ? 'fresh_api' : 'cache',
+          freshness: { maxAgeHours, forceFresh },
           timestamp: new Date().toISOString()
         });
       } else {
@@ -164,3 +250,15 @@ router.get('/:id', (req, res) => {
 });
 
 module.exports = router; 
+ 
+// Additional endpoint to manually refresh all news (admin/op usage)
+router.post('/refresh', async (req, res) => {
+  try {
+    console.log('🔄 POST /api/news/refresh - Manual refresh requested');
+    const result = await schedulerService.refreshAllTickersNews();
+    res.json({ success: true, result });
+  } catch (err) {
+    console.error('❌ Manual news refresh failed:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});

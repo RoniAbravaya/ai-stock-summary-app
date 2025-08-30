@@ -115,3 +115,15 @@ The app includes a gated redesign that can be turned on per-device without affec
 - **Rollback**:
   - The redesign is fully gated by the toggle; disabling it restores legacy UI.
   - All changes are on branch `feature/redesign-flag-toggle` to allow safe rollback via Git if needed.
+
+### Rollout strategy
+- Merge the PR with the toggle default OFF. No user-visible change until users enable it.
+- Soft launch by enabling the toggle for dogfooding and internal testers.
+- Collect feedback, then consider flipping the default to ON in a follow-up release.
+
+### Rollback steps
+1. In-app: toggle OFF in Settings to immediately restore legacy UI on device.
+2. Git:
+   - Revert the merge commit: `git revert -m 1 <merge_commit_sha>` and push.
+   - Or redeploy the pre-redesign tag/commit used before merging the PR.
+3. Store release notes indicating the rollback and any hotfixes applied.

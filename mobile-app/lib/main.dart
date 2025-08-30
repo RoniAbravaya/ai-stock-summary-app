@@ -1248,7 +1248,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12), // Reduced spacing
+            const SizedBox(height: 8),
+            _buildSummaryContent(stockId),
+            const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: () => _generateAISummary(context, stockId),
               icon: const Icon(Icons.auto_awesome),
@@ -1257,8 +1259,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 minimumSize: const Size(double.infinity, 48),
               ),
             ),
-            const SizedBox(height: 8),
-            _buildSummaryContent(stockId),
           ],
         ),
       ),
@@ -1267,16 +1267,25 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   Widget _buildSummaryContent(String stockId) {
     if (FirebaseService().isFirestoreAvailable) {
-      return FutureBuilder<DocumentSnapshot>(
-        future: FirebaseService().getStockSummary(stockId),
+      return StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseService()
+            .firestore
+            .collection('summaries')
+            .doc(stockId)
+            .snapshots(),
         builder: (context, summarySnapshot) {
+          if (summarySnapshot.connectionState == ConnectionState.waiting) {
+            return const SizedBox.shrink();
+          }
           if (summarySnapshot.hasData && summarySnapshot.data!.exists) {
             try {
-              final summary =
-                  summarySnapshot.data!.data() as Map<String, dynamic>?;
+              final summary = summarySnapshot.data!.data() as Map<String, dynamic>?;
               if (summary != null) {
+                final inputs = (summary['inputs'] as Map<String, dynamic>?) ?? {};
+                final priceDesc = (inputs['priceDesc'] as Map<String, dynamic>?) ?? {};
                 return _buildSummaryContainer(
                   summary['content'] ?? 'No summary available',
+                  smallInfo: _formatSmallInfo(priceDesc),
                 );
               }
             } catch (e) {
@@ -1294,7 +1303,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     return const Text('No summary generated yet');
   }
 
-  Widget _buildSummaryContainer(String content) {
+  Widget _buildSummaryContainer(String content, {String? smallInfo}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -1305,15 +1314,37 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'AI Summary:',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'AI Summary',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              if (smallInfo != null && smallInfo.isNotEmpty)
+                Text(
+                  smallInfo,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+            ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(content),
         ],
       ),
     );
+  }
+
+  String _formatSmallInfo(Map<String, dynamic> priceDesc) {
+    try {
+      final lastPrice = (priceDesc['lastPrice'] as num?)?.toDouble();
+      final pct = (priceDesc['dayChangePercent'] as num?)?.toDouble();
+      if (lastPrice == null || pct == null) return '';
+      final sign = pct >= 0 ? '+' : '';
+      return '• \$${lastPrice.toStringAsFixed(2)}  (${sign}${pct.toStringAsFixed(2)}%)';
+    } catch (_) {
+      return '';
+    }
   }
 
   void _removeFromFavorites(BuildContext context, String stockId) async {
@@ -1334,7 +1365,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     try {
       final content = await StockService().generateAISummary(stockId);
       if (!mounted) return;
-      showDialog(
+      await showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text('AI Summary — $stockId'),
@@ -1344,6 +1375,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ],
         ),
       );
+      if (!mounted) return;
+      setState(() {}); // trigger refresh to pull latest summary
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

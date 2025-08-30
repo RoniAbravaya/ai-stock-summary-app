@@ -4,6 +4,7 @@
  */
 
 const admin = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
 const dotenv = require('dotenv');
 
 // Load environment variables from .env file in development
@@ -16,6 +17,7 @@ if (process.env.NODE_ENV !== 'production') {
 class FirebaseService {
   constructor() {
     this._isInitialized = false;
+    this._firestore = null;
     this.init();
   }
 
@@ -71,6 +73,14 @@ class FirebaseService {
         });
       }
 
+      // Initialize Firestore for the named database used by the mobile app
+      try {
+        this._firestore = getFirestore(admin.app(), 'flutter-database');
+      } catch (e) {
+        console.warn('⚠️ Falling back to default Firestore database:', e?.message || e);
+        this._firestore = admin.firestore();
+      }
+
       this._isInitialized = true;
       console.log('✅ Firebase Admin SDK initialized successfully');
     } catch (error) {
@@ -92,7 +102,7 @@ class FirebaseService {
    * Get Firestore instance
    */
   get firestore() {
-    return this._isInitialized ? admin.firestore() : null;
+    return this._isInitialized ? this._firestore : null;
   }
 
   /**

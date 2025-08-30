@@ -10,6 +10,7 @@ const stockCacheService = require('../services/stockCacheService');
 const newsCacheService = require('../services/newsCacheService');
 const schedulerService = require('../services/schedulerService');
 const OpenAI = require('openai');
+const firebaseService = require('../services/firebaseService');
 
 // POST /api/summary/generate - Generate new summary
 router.post('/generate', async (req, res) => {
@@ -144,6 +145,28 @@ router.post('/generate', async (req, res) => {
 
     const content = completion.choices?.[0]?.message?.content?.trim() || '';
 
+    // Persist summary to Firestore if available
+    try {
+      const db = firebaseService.firestore;
+      if (db) {
+        await db
+          .collection('summaries')
+          .doc(ticker)
+          .set(
+            {
+              content,
+              ticker,
+              model,
+              inputs: { priceDesc, newsCount: newsDesc.length },
+              updatedAt: firebaseService.admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+      }
+    } catch (persistError) {
+      console.warn('⚠️ Failed to persist summary to Firestore:', persistError?.message || persistError);
+    }
+
     return res.json({
       success: true,
       data: {
@@ -172,7 +195,7 @@ router.get('/get/:stockId', async (req, res) => {
   try {
     const stockId = req.params.stockId.toUpperCase();
     console.log(`🤖 GET /api/summary/get/${stockId} - Fetching existing summary`);
-    
+
     // Check if mock data is enabled
     if (process.env.ENABLE_MOCK_DATA === 'true') {
       console.log('🎭 Mock data enabled, returning mock summary');
@@ -185,14 +208,35 @@ router.get('/get/:stockId', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     }
-    
-    // For now, return placeholder response
-    res.status(404).json({
-      success: false,
-      error: 'Summary not found',
-      message: 'No summary available for this stock',
-      stockId: stockId,
-      timestamp: new Date().toISOString()
+
+    const db = firebaseService.firestore;
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        error: 'Firestore unavailable',
+        message: 'Backend Firestore is not initialized',
+        stockId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const doc = await db.collection('summaries').doc(stockId).get();
+    if (!doc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Summary not found',
+        message: 'No summary available for this stock',
+        stockId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: doc.data(),
+      stockId,
+      source: 'firestore',
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error(`❌ Error in GET /api/summary/get/${req.params.stockId}:`, error);

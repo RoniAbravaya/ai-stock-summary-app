@@ -1320,13 +1320,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     try {
       // Use Firestore for real-time sync
       await FirebaseService().removeFromFavorites(stockId);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Removed from favorites')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Removed from favorites')));
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
   }
 

@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StocksScreen extends StatefulWidget {
   const StocksScreen({super.key, required this.firebaseEnabled});
@@ -808,14 +809,60 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
                   )),
             ],
           ),
-          IconButton(
-            tooltip: 'Add to favorites',
-            icon: const Icon(Icons.favorite_border),
-            onPressed: () => _addToFavorites(context, stock.symbol),
+          // Reactive favorite toggle using Firestore
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseService()
+                .firestore
+                .collection('favorites')
+                .doc(FirebaseService().auth.currentUser?.uid)
+                .collection('stocks')
+                .doc(stock.symbol)
+                .snapshots(),
+            builder: (context, snap) {
+              final exists = snap.data?.exists == true;
+              return IconButton(
+                tooltip: exists ? 'Remove from favorites' : 'Add to favorites',
+                icon: Icon(exists ? Icons.favorite : Icons.favorite_border,
+                    color: exists ? Colors.red : null),
+                onPressed: () => exists
+                    ? _removeFavorite(stock.symbol)
+                    : _addFavorite(stock.symbol),
+              );
+            },
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _addFavorite(String symbol) async {
+    try {
+      await FirebaseService().addToFavorites(symbol);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Added $symbol to favorites')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  Future<void> _removeFavorite(String symbol) async {
+    try {
+      await FirebaseService().removeFromFavorites(symbol);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Removed $symbol from favorites')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   Widget _buildChartCard(ThemeData theme, Stock stock) {

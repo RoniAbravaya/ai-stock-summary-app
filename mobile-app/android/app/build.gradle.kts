@@ -32,23 +32,23 @@ android {
     }
 
     signingConfigs {
-        release {
+        create("release") {
             val keystoreProperties = java.util.Properties()
-            val keystorePropertiesFile = rootProject.file("key.properties")
+            val keystorePropertiesFile = rootProject.file("android/key.properties")
             if (keystorePropertiesFile.exists()) {
                 keystoreProperties.load(keystorePropertiesFile.inputStream())
             }
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as String?
+            keyPassword = keystoreProperties["keyPassword"] as String?
             storeFile = file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
+            storePassword = keystoreProperties["storePassword"] as String?
         }
     }
 
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
-            minifyEnabled = false
+            isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

@@ -1,0 +1,97 @@
+name: Deploy to Play Store
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Release track'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+        - internal
+        - alpha
+        - beta
+        - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.35.1'
+        channel: 'stable'
+        cache: true
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+        
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        npm ci
+        
+    - name: Auto-increment version
+      id: version
+      run: |
+        cd backend
+        NEW_VERSION=$(node scripts/auto-increment-version.js)
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "✅ New version: $NEW_VERSION"
+        
+    - name: Setup Android signing
+      run: |
+        cd mobile-app/android
+        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/upload-keystore.jks
+        echo "storeFile=upload-keystore.jks" > key.properties
+        echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> key.properties
+        echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> key.properties
+        echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> key.properties
+        
+    - name: Setup Firebase config
+      run: |
+        cd mobile-app/android/app
+        echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > google-services.json
+        
+    - name: Build AAB
+      run: |
+        cd mobile-app
+        flutter pub get
+        flutter build appbundle --release
+        
+    - name: Setup Play Console service account
+      run: |
+        echo "${{ secrets.PLAY_CONSOLE_SA_JSON }}" | base64 -d > play-console-sa.json
+        
+    - name: Upload to Play Store
+      run: |
+        cd backend
+        TRACK="${{ github.event.inputs.track || 'internal' }}"
+        node scripts/upload-to-play.js com.ai_stock_summary ../mobile-app/build/app/outputs/bundle/release/app-release.aab ../play-console-sa.json $TRACK
+        
+    - name: Commit version bump
+      if: success()
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add mobile-app/pubspec.yaml
+        git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}" || exit 0
+        git push

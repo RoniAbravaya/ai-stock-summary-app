@@ -60,8 +60,8 @@ jobs:
     - name: Setup Android signing
       run: |
         cd mobile-app/android
-        # Generate keystore in CI (since local keytool has issues)
-        keytool -genkey -v -keystore app/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -dname "CN=GitHub Actions, OU=CI, O=AI Stock Summary, L=Cloud, ST=Cloud, C=US"
+        # Decode the existing upload keystore from secrets
+        echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > app/upload-keystore.jks
         echo "storeFile=upload-keystore.jks" > key.properties
         echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> key.properties
         echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> key.properties

@@ -3,10 +3,11 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
 }
 
 android {
-    namespace = "com.example.ai_stock_summary"
+    namespace = "com.ai_stock_summary"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
@@ -21,7 +22,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.ai_stock_summary"
+        applicationId = "com.ai_stock_summary"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion  // Updated for Firebase compatibility
@@ -56,10 +57,4 @@ flutter {
     source = "../.."
 }
 
-// Apply Google Services plugin only if google-services.json is present to allow local builds
-val googleServicesJson = file("google-services.json")
-if (googleServicesJson.exists()) {
-    apply(plugin = "com.google.gms.google-services")
-} else {
-    logger.lifecycle("google-services.json not found in app module; skipping Google Services plugin.")
-}
+// Google Services plugin is now applied in the plugins block above

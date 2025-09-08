@@ -1,8 +1,6 @@
 name: Deploy to Play Store
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       track:
@@ -56,20 +54,33 @@ jobs:
         echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
         echo "✅ New version: $NEW_VERSION"
         
+    - name: Validate secrets
+      shell: bash
+      run: |
+        required=(UPLOAD_KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD GOOGLE_SERVICES_JSON PLAY_CONSOLE_SA_JSON)
+        for s in "${required[@]}"; do
+          if [ -z "${!s}" ]; then echo "Missing secret: $s"; exit 1; fi
+        done
+      env:
+        UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        PLAY_CONSOLE_SA_JSON: ${{ secrets.PLAY_CONSOLE_SA_JSON }}
+
     - name: Setup Android signing
+      if: success()
       run: |
         cd mobile-app/android
-        # Decode the existing upload keystore from secrets
-        echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > app/upload-keystore.jks
-        echo "storeFile=upload-keystore.jks" > key.properties
-        echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> key.properties
-        echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> key.properties
-        echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> key.properties
+        echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 --decode > app/upload-keystore.jks
+        printf "storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
+          "${{ secrets.KEYSTORE_PASSWORD }}" "${{ secrets.KEY_ALIAS }}" "${{ secrets.KEY_PASSWORD }}" > key.properties
         
     - name: Setup Firebase config
       run: |
         cd mobile-app/android/app
-        echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > google-services.json
+        echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > google-services.json
         
     - name: Build AAB
       run: |

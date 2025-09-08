@@ -30,6 +30,31 @@ jobs:
       working-directory: mobile-app
       run: flutter pub get
 
+    - name: Setup Android signing (required for signed AAB)
+      shell: bash
+      run: |
+        cd mobile-app/android
+        # Require signing secrets for release AAB
+        if [ -z "${UPLOAD_KEYSTORE_BASE64}" ] && [ -z "${KEYSTORE_BASE64}" ]; then
+          echo "Missing UPLOAD_KEYSTORE_BASE64 (or KEYSTORE_BASE64)" >&2; exit 1
+        fi
+        if [ -z "${KEYSTORE_PASSWORD}" ] || [ -z "${KEY_ALIAS}" ] || [ -z "${KEY_PASSWORD}" ]; then
+          echo "Missing one of KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD" >&2; exit 1
+        fi
+        echo "${UPLOAD_KEYSTORE_BASE64:-$KEYSTORE_BASE64}" | base64 --decode --ignore-garbage > app/upload-keystore.jks
+        printf "storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
+          "${KEYSTORE_PASSWORD}" "${KEY_ALIAS}" "${KEY_PASSWORD}" > key.properties
+        # Validate keystore
+        if ! keytool -list -keystore app/upload-keystore.jks -storepass "${KEYSTORE_PASSWORD}" >/dev/null 2>&1; then
+          echo "Keystore validation failed" >&2; exit 1
+        fi
+      env:
+        UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
     - name: Build release AAB
       working-directory: mobile-app
       run: flutter build appbundle --release --no-tree-shake-icons

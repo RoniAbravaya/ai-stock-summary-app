@@ -53,9 +53,10 @@ android {
 
     buildTypes {
         release {
-            if (hasSigning) {
-                signingConfig = signingConfigs.getByName("release")
+            if (!hasSigning) {
+                throw GradleException("Release signing is required. key.properties not found.")
             }
+            signingConfig = signingConfigs.getByName("release")
             // Disable resource shrinking unless code shrinking (minify) is enabled
             // to avoid Gradle error in CI when signing is absent
             isShrinkResources = false

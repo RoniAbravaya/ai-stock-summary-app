@@ -118,62 +118,21 @@ class _AIStockSummaryAppState extends State<AIStockSummaryApp> {
       stream: _languageStreamController.stream,
       initialData: _languageService.currentLanguage,
       builder: (context, langSnap) {
-        return StreamBuilder<bool>(
-          stream: _featureFlags.redesignStream,
-          initialData: _featureFlags.redesignEnabled,
-          builder: (context, flagSnap) {
-            final bool redesign = flagSnap.data ?? false;
-            final ThemeData lightTheme = redesign
-                ? _buildRedesignLightTheme()
-                : ThemeData(
-                    colorScheme: ColorScheme.fromSeed(
-                      seedColor: Color(AppConfig.primaryBlue),
-                      brightness: Brightness.light,
-                    ),
-                    useMaterial3: true,
-                    fontFamily: AppTextStyles.fontFamily,
-                    appBarTheme: const AppBarTheme(
-                      centerTitle: true,
-                      elevation: 0,
-                      backgroundColor: Color(AppConfig.primaryBlue),
-                      foregroundColor: Colors.white,
-                    ),
-                    elevatedButtonTheme: ElevatedButtonThemeData(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(AppConfig.primaryBlue),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  );
+        final ThemeData lightTheme = _buildRedesignLightTheme();
+        final ThemeData darkTheme = _buildRedesignDarkTheme();
 
-            final ThemeData darkTheme = redesign
-                ? _buildRedesignDarkTheme()
-                : ThemeData(
-                    colorScheme: ColorScheme.fromSeed(
-                      seedColor: Color(AppConfig.primaryBlue),
-                      brightness: Brightness.dark,
-                    ),
-                    useMaterial3: true,
-                    fontFamily: AppTextStyles.fontFamily,
-                  );
-
-            return MaterialApp(
-              title: _languageService.translate('app_name'),
-              theme: lightTheme,
-              darkTheme: darkTheme,
-              debugShowCheckedModeBanner: AppConfig.isDevelopment,
-              home: AuthWrapper(
-                firebaseEnabled: widget.firebaseEnabled,
-                onLanguageChanged: () {
-                  _languageStreamController
-                      .add(_languageService.currentLanguage);
-                },
-              ),
-            );
-          },
+        return MaterialApp(
+          title: _languageService.translate('app_name'),
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          debugShowCheckedModeBanner: AppConfig.isDevelopment,
+          home: AuthWrapper(
+            firebaseEnabled: widget.firebaseEnabled,
+            onLanguageChanged: () {
+              _languageStreamController
+                  .add(_languageService.currentLanguage);
+            },
+          ),
         );
       },
     );
@@ -884,8 +843,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: FeatureFlagService().redesignEnabled
-          ? SafeArea(
+      bottomNavigationBar: SafeArea(
               minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
@@ -926,14 +884,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-            )
-          : BottomNavigationBar(
-              currentIndex: _currentIndex,
-              onTap: (index) => setState(() => _currentIndex = index),
-              type: BottomNavigationBarType.fixed,
-              selectedItemColor: Color(AppConfig.primaryBlue),
-              unselectedItemColor: Color(AppConfig.textLight),
-              items: _navItems,
             ),
     );
   }
@@ -1792,16 +1742,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Column(
                   children: [
-                    SwitchListTile(
-                      value: FeatureFlagService().redesignEnabled,
-                      onChanged: (enabled) async {
-                        await FeatureFlagService().setRedesignEnabled(enabled);
-                        if (mounted) setState(() {});
-                      },
-                      title: const Text('Use new design'),
-                      subtitle: const Text('Toggle the redesigned theme'),
-                    ),
-                    const Divider(height: 1),
+                    // Redesign always enabled; toggle removed
                     ListTile(
                       leading: _settingsIcon(context, Icons.notifications),
                       title: Text(LanguageService().translate('settings_notifications')),
@@ -1854,16 +1795,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   children: [
                     // Redesign toggle (visible even in legacy style)
-                    SwitchListTile(
-                      value: FeatureFlagService().redesignEnabled,
-                      onChanged: (enabled) async {
-                        await FeatureFlagService().setRedesignEnabled(enabled);
-                        if (mounted) setState(() {});
-                      },
-                      title: const Text('Use new design'),
-                      subtitle: const Text('Toggle the redesigned theme'),
-                    ),
-                    const Divider(height: 1),
+                    // Redesign always enabled; toggle removed
                     _buildSettingsTile(
                       context: context,
                       icon: Icons.notifications,

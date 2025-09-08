@@ -6,6 +6,7 @@
 const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const {logger} = require("firebase-functions");
 const admin = require("firebase-admin");
+const { getFirestore } = require("firebase-admin/firestore");
 
 admin.initializeApp();
 
@@ -13,7 +14,7 @@ admin.initializeApp();
  * Process notification document created in admin_notifications collection
  */
 exports.processNotification = onDocumentCreated(
-  "admin_notifications/{notificationId}",
+  { document: "admin_notifications/{notificationId}", database: "projects/_/databases/flutter-database" },
   async (event) => {
     try {
       // Debug the entire event structure first
@@ -48,6 +49,7 @@ exports.processNotification = onDocumentCreated(
       }
 
       const messaging = admin.messaging();
+      const db = getFirestore(admin.app(), "flutter-database");
 
       // Check for both old and new field names for compatibility
       const notificationType = notification.type || notification.target;
@@ -110,8 +112,8 @@ exports.processNotification = onDocumentCreated(
 async function sendToAllUsers(messaging, notification) {
   logger.info("📤 Sending to all users");
 
-  const usersSnapshot = await admin
-      .firestore()
+  const db = getFirestore(admin.app(), "flutter-database");
+  const usersSnapshot = await db
       .collection("users")
       .get();
 
@@ -152,8 +154,8 @@ async function sendToUserType(messaging, notification) {
     return;
   }
 
-  const usersSnapshot = await admin
-      .firestore()
+  const db = getFirestore(admin.app(), "flutter-database");
+  const usersSnapshot = await db
       .collection("users")
       .where("subscriptionType", "==", userType)
       .get();
@@ -183,8 +185,8 @@ async function sendToSpecificUser(messaging, notification) {
     return;
   }
 
-  const userSnapshot = await admin
-      .firestore()
+  const db = getFirestore(admin.app(), "flutter-database");
+  const userSnapshot = await db
       .collection("users")
       .where("email", "==", targetEmail)
       .limit(1)
@@ -323,8 +325,8 @@ async function getTokenToUserMapping(tokens) {
     // Process each batch
     for (const tokenBatch of tokenBatches) {
       try {
-        const usersSnapshot = await admin
-            .firestore()
+        const db = getFirestore(admin.app(), "flutter-database");
+        const usersSnapshot = await db
             .collection("users")
             .where("fcmToken", "in", tokenBatch)
             .get();
@@ -356,12 +358,12 @@ async function storeNotificationHistory(userIds, notification) {
   try {
     logger.info(`📝 Storing notification history for ${userIds.length} users`);
     
-    const batch = admin.firestore().batch();
+    const db = getFirestore(admin.app(), "flutter-database");
+    const batch = db.batch();
     const notificationType = notification.type || notification.target || 'admin_broadcast';
     
     userIds.forEach((userId) => {
-      const notificationRef = admin
-          .firestore()
+      const notificationRef = db
           .collection('user_notifications')
           .doc(userId)
           .collection('notifications')
@@ -394,12 +396,12 @@ async function cleanupInvalidTokens(invalidTokens) {
   logger.info(`🧹 Cleaning up ${invalidTokens.length} invalid tokens`);
   
   try {
-    const usersSnapshot = await admin
-        .firestore()
+    const db = getFirestore(admin.app(), "flutter-database");
+    const usersSnapshot = await db
         .collection("users")
         .get();
 
-    const batch = admin.firestore().batch();
+    const batch = db.batch();
     let cleanedCount = 0;
 
     usersSnapshot.forEach((doc) => {

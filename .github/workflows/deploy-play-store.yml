@@ -33,7 +33,6 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.35.1'
         channel: 'stable'
         cache: true
         
@@ -76,7 +75,7 @@ jobs:
       run: |
         cd mobile-app
         flutter pub get
-        flutter build appbundle --release
+        flutter build appbundle --release --no-tree-shake-icons
         
     - name: Setup Play Console service account
       run: |

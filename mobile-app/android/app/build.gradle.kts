@@ -57,6 +57,9 @@ android {
             if (hasSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            // Disable resource shrinking unless code shrinking (minify) is enabled
+            // to avoid Gradle error in CI when signing is absent
+            isShrinkResources = false
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

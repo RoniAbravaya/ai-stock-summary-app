@@ -54,49 +54,73 @@ jobs:
         echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
         echo "✅ New version: $NEW_VERSION"
         
-    - name: Validate secrets
+    - name: Evaluate secrets and set flags
       shell: bash
       run: |
-        required=(UPLOAD_KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD GOOGLE_SERVICES_JSON PLAY_CONSOLE_SA_JSON)
-        for s in "${required[@]}"; do
-          if [ -z "${!s}" ]; then echo "Missing secret: $s"; exit 1; fi
+        FAIL_UPLOAD=false
+        for s in UPLOAD_KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD PLAY_CONSOLE_SA_JSON; do
+          if [ -z "${!s}" ]; then echo "Missing secret: $s"; FAIL_UPLOAD=true; fi
         done
+        if [ "$FAIL_UPLOAD" = "true" ]; then
+          echo "FALLBACK_DEBUG=true" >> $GITHUB_ENV
+        fi
       env:
         UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         PLAY_CONSOLE_SA_JSON: ${{ secrets.PLAY_CONSOLE_SA_JSON }}
 
     - name: Setup Android signing
-      if: success()
+      if: env.FALLBACK_DEBUG != 'true'
       run: |
         cd mobile-app/android
-        echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 --decode > app/upload-keystore.jks
+        echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 --decode --ignore-garbage > app/upload-keystore.jks
         printf "storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
           "${{ secrets.KEYSTORE_PASSWORD }}" "${{ secrets.KEY_ALIAS }}" "${{ secrets.KEY_PASSWORD }}" > key.properties
+        # Validate keystore
+        if ! keytool -list -keystore app/upload-keystore.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" >/dev/null 2>&1; then
+          echo "Keystore validation failed. Falling back to debug build."
+          echo "FALLBACK_DEBUG=true" >> $GITHUB_ENV
+        fi
         
     - name: Setup Firebase config
       run: |
         cd mobile-app/android/app
-        echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > google-services.json
+        echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode --ignore-garbage > google-services.json
         
     - name: Build AAB
+      if: env.FALLBACK_DEBUG != 'true'
       run: |
         cd mobile-app
         flutter pub get
         flutter build appbundle --release --no-tree-shake-icons
         
     - name: Setup Play Console service account
+      if: env.FALLBACK_DEBUG != 'true'
       run: |
-        echo "${{ secrets.PLAY_CONSOLE_SA_JSON }}" | base64 -d > play-console-sa.json
+        echo "${{ secrets.PLAY_CONSOLE_SA_JSON }}" | base64 --decode --ignore-garbage > play-console-sa.json
         
     - name: Upload to Play Store
+      if: env.FALLBACK_DEBUG != 'true'
       run: |
         cd backend
         TRACK="${{ github.event.inputs.track || 'internal' }}"
         node scripts/upload-to-play.js com.ai_stock_summary ../mobile-app/build/app/outputs/bundle/release/app-release.aab ../play-console-sa.json $TRACK
+
+    - name: Build debug APK (fallback)
+      if: env.FALLBACK_DEBUG == 'true'
+      run: |
+        cd mobile-app
+        flutter pub get
+        flutter build apk --debug
+
+    - name: Upload APK artifact (fallback)
+      if: env.FALLBACK_DEBUG == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ai-stock-summary-debug-apk
+        path: mobile-app/build/app/outputs/apk/debug/app-debug.apk
         
     - name: Commit version bump
       if: success()

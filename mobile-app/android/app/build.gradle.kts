@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -31,23 +33,30 @@ android {
         versionName = flutter.versionName
     }
 
+    val hasSigning = rootProject.file("key.properties").exists()
+
     signingConfigs {
         create("release") {
-            val keystoreProperties = java.util.Properties()
-            val keystorePropertiesFile = rootProject.file("android/key.properties")
+            val keystorePropertiesFile = rootProject.file("key.properties")
             if (keystorePropertiesFile.exists()) {
+                val keystoreProperties = Properties()
                 keystoreProperties.load(keystorePropertiesFile.inputStream())
+                keyAlias = keystoreProperties["keyAlias"] as String?
+                keyPassword = keystoreProperties["keyPassword"] as String?
+                val storePath = keystoreProperties["storeFile"] as String?
+                if (!storePath.isNullOrBlank()) {
+                    storeFile = file(storePath)
+                }
+                storePassword = keystoreProperties["storePassword"] as String?
             }
-            keyAlias = keystoreProperties["keyAlias"] as String?
-            keyPassword = keystoreProperties["keyPassword"] as String?
-            storeFile = file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String?
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            if (hasSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

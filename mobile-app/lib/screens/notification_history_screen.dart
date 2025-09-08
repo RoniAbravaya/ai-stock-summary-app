@@ -4,7 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import '../config/app_config.dart';
 import '../services/firebase_service.dart';
 import '../services/language_service.dart';
-import '../services/feature_flag_service.dart';
+ 
 
 /// Notification History Screen
 /// Displays all notifications ever received by the user
@@ -54,7 +54,6 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final redesign = FeatureFlagService().redesignEnabled;
     return Scaffold(
       appBar: AppBar(
         title: Text(LanguageService().translate('notif_history_title')),
@@ -65,7 +64,7 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
           ),
         ],
       ),
-      body: redesign ? _buildRedesignedBody() : _buildBody(),
+      body: _buildRedesignedBody(),
     );
   }
 

@@ -4,7 +4,7 @@ import '../config/app_config.dart';
 import '../services/firebase_service.dart';
 import '../services/language_service.dart';
 import 'notification_history_screen.dart';
-import '../services/feature_flag_service.dart';
+ 
 
 /// Notification Settings Screen
 /// Allows users to manage notification preferences with a master toggle
@@ -62,14 +62,13 @@ class _NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final redesign = FeatureFlagService().redesignEnabled;
     return Scaffold(
       appBar: AppBar(
         title: Text(LanguageService().translate('settings_notifications')),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : (redesign ? _buildRedesigned() : _buildNotificationSettings()),
+          : _buildRedesigned(),
     );
   }
 

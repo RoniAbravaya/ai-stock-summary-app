@@ -4,7 +4,7 @@ import '../services/firebase_service.dart';
 import '../config/app_config.dart';
 import '../models/stock_models.dart';
 import '../widgets/environment_switcher.dart';
-import '../services/feature_flag_service.dart';
+ 
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -399,48 +399,6 @@ class _StocksScreenState extends State<StocksScreen> {
   Widget _buildStockCard(Stock stock) {
     final isFavorite = _favoriteSymbols.contains(stock.symbol);
 
-    final bool redesign = FeatureFlagService().redesignEnabled;
-    if (!redesign) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Color(AppConfig.primaryBlue),
-            child: Text(
-              stock.symbol.substring(0, stock.symbol.length > 2 ? 2 : 1),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          title: Text(
-            stock.symbol,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Text(stock.name),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                stock.formattedPrice,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              Text(
-                '${stock.formattedChange} (${stock.formattedChangePercent})',
-                style: TextStyle(
-                  color: stock.isPositiveChange ? Colors.green : Colors.red,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          onTap: () => _showStockDetails(stock.symbol),
-        ),
-      );
-    }
-
     final theme = Theme.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(14),
@@ -697,27 +655,6 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool redesign = FeatureFlagService().redesignEnabled;
-
-    if (!redesign) {
-      return Scaffold(
-        appBar: AppBar(title: Text('${widget.symbol} Details')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.info_outline, size: 64, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
-              Text('Stock Details for ${widget.symbol}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Detailed view coming soon...'),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(title: Text(widget.symbol)),
       body: FutureBuilder<Stock>(

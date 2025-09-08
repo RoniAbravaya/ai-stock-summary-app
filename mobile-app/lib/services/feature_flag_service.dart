@@ -11,7 +11,7 @@ class FeatureFlagService {
   static const String _redesignKey = 'feature_redesign_enabled';
 
   SharedPreferences? _prefs;
-  bool _redesignEnabled = false;
+  bool _redesignEnabled = true;
   final StreamController<bool> _redesignStreamController =
       StreamController<bool>.broadcast();
 
@@ -22,16 +22,20 @@ class FeatureFlagService {
   Future<void> initialize() async {
     if (_prefs != null) return;
     _prefs = await SharedPreferences.getInstance();
-    _redesignEnabled = _prefs!.getBool(_redesignKey) ?? false;
+    // Force redesign ON and persist it
+    _redesignEnabled = true;
+    await _prefs!.setBool(_redesignKey, true);
+    _redesignStreamController.add(true);
   }
 
   Future<void> setRedesignEnabled(bool enabled) async {
     if (_prefs == null) {
       await initialize();
     }
-    _redesignEnabled = enabled;
-    await _prefs!.setBool(_redesignKey, enabled);
-    _redesignStreamController.add(enabled);
+    // Ignore input and keep redesign ON
+    _redesignEnabled = true;
+    await _prefs!.setBool(_redesignKey, true);
+    _redesignStreamController.add(true);
   }
 
   void dispose() {

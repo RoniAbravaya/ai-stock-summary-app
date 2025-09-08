@@ -3,7 +3,7 @@ import '../services/news_service.dart';
 import '../services/api_service.dart';
 import '../config/app_config.dart';
 import '../widgets/environment_switcher.dart';
-import '../services/feature_flag_service.dart';
+ 
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key, required this.firebaseEnabled});
@@ -165,57 +165,6 @@ class _NewsScreenState extends State<NewsScreen> {
   }
 
   Widget _buildNewsCard(Map<String, dynamic> news) {
-    final bool redesign = FeatureFlagService().redesignEnabled;
-
-    if (!redesign) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 16),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => _handleArticleTap(news),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (news['img'] != null)
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Image.network(
-                    news['img'],
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.grey[200],
-                        child: const Center(
-                          child: Icon(Icons.image_not_supported, size: 40),
-                        ),
-                      );
-                    },
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Container(
-                        color: Colors.grey[200],
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: _buildNewsTextContent(news),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     // Redesign card
     final theme = Theme.of(context);
     return InkWell(

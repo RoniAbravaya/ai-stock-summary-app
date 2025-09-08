@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/language_service.dart';
 import '../config/app_config.dart';
-import '../services/feature_flag_service.dart';
+ 
 
 /// Language Settings Screen
 /// Allows users to select their preferred language from supported options
@@ -32,14 +32,13 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final redesign = FeatureFlagService().redesignEnabled;
     return Scaffold(
       appBar: AppBar(
         title: Text(_languageService.translate('settings_language')),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : (redesign ? _buildRedesignedList() : _buildLanguageList()),
+          : _buildRedesignedList(),
     );
   }
 

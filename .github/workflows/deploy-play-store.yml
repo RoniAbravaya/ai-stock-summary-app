@@ -1,6 +1,8 @@
 name: Deploy to Play Store
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       track:
@@ -62,7 +64,12 @@ jobs:
           if [ -z "${!s}" ]; then echo "Missing secret: $s"; FAIL_UPLOAD=true; fi
         done
         if [ "$FAIL_UPLOAD" = "true" ]; then
-          echo "FALLBACK_DEBUG=true" >> $GITHUB_ENV
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "FALLBACK_DEBUG=true" >> $GITHUB_ENV
+          else
+            echo "Required secrets missing for release upload on push. Failing." >&2
+            exit 1
+          fi
         fi
       env:
         UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
@@ -70,6 +77,7 @@ jobs:
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         PLAY_CONSOLE_SA_JSON: ${{ secrets.PLAY_CONSOLE_SA_JSON }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
 
     - name: Setup Android signing
       if: env.FALLBACK_DEBUG != 'true'

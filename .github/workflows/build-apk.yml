@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android AAB
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  build-apk:
+  build-aab:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,16 +30,13 @@ jobs:
       working-directory: mobile-app
       run: flutter pub get
 
-    - name: Build release APK
+    - name: Build release AAB
       working-directory: mobile-app
-      run: flutter build apk --release --no-tree-shake-icons
+      run: flutter build appbundle --release --no-tree-shake-icons
 
-    - name: Upload APK artifact
+    - name: Upload AAB artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ai-stock-summary-release-apk
-        # Support both legacy and new Flutter output directories
-        path: |
-          mobile-app/build/app/outputs/flutter-apk/app-release.apk
-          mobile-app/build/app/outputs/apk/release/app-release.apk
+        name: ai-stock-summary-release-aab
+        path: mobile-app/build/app/outputs/bundle/release/app-release.aab
         if-no-files-found: warn

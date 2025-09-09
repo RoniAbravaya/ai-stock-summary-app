@@ -19,10 +19,16 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
       
     - name: Setup Java
       uses: actions/setup-java@v4
@@ -158,3 +164,5 @@ jobs:
         git add mobile-app/pubspec.yaml
         git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}" || exit 0
         git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

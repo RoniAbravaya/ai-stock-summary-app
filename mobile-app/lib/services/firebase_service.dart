@@ -14,14 +14,11 @@ class FirebaseService {
   factory FirebaseService() => _instance;
   FirebaseService._internal();
 
-  // Firebase instances
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(
-    app: Firebase.app(),
-    databaseId: 'flutter-database',
-  );
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  // Firebase instances (lazy to avoid crashes in tests where Firebase isn't initialized)
+  FirebaseAuth? _auth;
+  FirebaseFirestore? _firestore;
+  FirebaseMessaging? _messaging;
+  FirebaseStorage? _storage;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Connection status
@@ -30,10 +27,44 @@ class FirebaseService {
   final bool _isAuthAvailable = true; // Added for Google Sign-In
 
   // Getters
-  FirebaseAuth get auth => _auth;
-  FirebaseFirestore get firestore => _firestore;
-  FirebaseMessaging get messaging => _messaging;
-  FirebaseStorage get storage => _storage;
+  FirebaseAuth get auth {
+    if (_auth != null) return _auth!;
+    if (Firebase.apps.isEmpty) {
+      throw Exception('Firebase not initialized. Call Firebase.initializeApp() first.');
+    }
+    _auth = FirebaseAuth.instance;
+    return _auth!;
+  }
+
+  FirebaseFirestore get firestore {
+    if (_firestore != null) return _firestore!;
+    if (Firebase.apps.isEmpty) {
+      throw Exception('Firebase not initialized. Call Firebase.initializeApp() first.');
+    }
+    _firestore = FirebaseFirestore.instanceFor(
+      app: Firebase.app(),
+      databaseId: 'flutter-database',
+    );
+    return _firestore!;
+  }
+
+  FirebaseMessaging get messaging {
+    if (_messaging != null) return _messaging!;
+    if (Firebase.apps.isEmpty) {
+      throw Exception('Firebase not initialized. Call Firebase.initializeApp() first.');
+    }
+    _messaging = FirebaseMessaging.instance;
+    return _messaging!;
+  }
+
+  FirebaseStorage get storage {
+    if (_storage != null) return _storage!;
+    if (Firebase.apps.isEmpty) {
+      throw Exception('Firebase not initialized. Call Firebase.initializeApp() first.');
+    }
+    _storage = FirebaseStorage.instance;
+    return _storage!;
+  }
   User? get currentUser => _auth.currentUser;
   bool get isSignedIn => _auth.currentUser != null;
   bool get isFirestoreAvailable => _isFirestoreAvailable;
@@ -63,6 +94,10 @@ class FirebaseService {
   /// Initialize Firebase Cloud Messaging according to documentation
   Future<void> _initializeFCM() async {
     try {
+      if (Firebase.apps.isEmpty) {
+        // In tests or pre-init environments, skip
+        return;
+      }
       print('🔧 Initializing Firebase Cloud Messaging...');
 
       // Request notification permissions
@@ -105,6 +140,7 @@ class FirebaseService {
   /// Prompt Android 13+ POST_NOTIFICATIONS runtime permission if needed
   Future<void> ensureAndroidNotificationPermission() async {
     try {
+      if (Firebase.apps.isEmpty) return; // Skip in tests where Firebase is not initialized
       final settings = await FirebaseMessaging.instance.getNotificationSettings();
       if (settings.authorizationStatus == AuthorizationStatus.notDetermined ||
           settings.authorizationStatus == AuthorizationStatus.denied) {
@@ -183,6 +219,11 @@ class FirebaseService {
   /// Check if Firestore is available and responsive
   Future<void> _checkFirestoreConnection() async {
     try {
+      if (Firebase.apps.isEmpty) {
+        _isFirestoreAvailable = false;
+        print('⚠️ Firestore not available: Firebase not initialized');
+        return;
+      }
       // Only check connection every 30 seconds to avoid repeated checks
       if (_lastConnectionCheck != null &&
           DateTime.now().difference(_lastConnectionCheck!).inSeconds < 30) {

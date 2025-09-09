@@ -104,8 +104,12 @@ class _AIStockSummaryAppState extends State<AIStockSummaryApp> {
   void initState() {
     super.initState();
     _languageStreamController = StreamController<String>.broadcast();
-    // Ensure Android 13+ notifications permission is requested
-    FirebaseService().ensureAndroidNotificationPermission();
+    // Ensure Android 13+ notifications permission is requested (skip if Firebase not ready)
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await FirebaseService().ensureAndroidNotificationPermission();
+      } catch (_) {}
+    });
   }
 
   @override

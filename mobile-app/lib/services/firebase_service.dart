@@ -65,8 +65,8 @@ class FirebaseService {
     _storage = FirebaseStorage.instance;
     return _storage!;
   }
-  User? get currentUser => _auth.currentUser;
-  bool get isSignedIn => _auth.currentUser != null;
+  User? get currentUser => _auth?.currentUser;
+  bool get isSignedIn => _auth?.currentUser != null;
   bool get isFirestoreAvailable => _isFirestoreAvailable;
 
   /// Initialize Firebase services
@@ -176,7 +176,7 @@ class FirebaseService {
   /// Store FCM token in user document for admin notifications
   Future<void> _storeFCMToken(String token) async {
     try {
-      final user = _auth.currentUser;
+      final user = _auth?.currentUser;
       if (user != null && _isFirestoreAvailable) {
         await _firestore.collection('users').doc(user.uid).update({
           'fcmToken': token,
@@ -251,7 +251,7 @@ class FirebaseService {
   Future<UserCredential?> signInWithEmail(String email, String password) async {
     try {
       // Add better error handling for type casting issues
-      UserCredential result = await _auth.signInWithEmailAndPassword(
+      UserCredential result = await auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -287,13 +287,13 @@ class FirebaseService {
       if (e.toString().contains('PigeonUserDetails') ||
           e.toString().contains('type cast')) {
         // Check if authentication was actually successful
-        if (_auth.currentUser != null && _auth.currentUser!.email == email) {
+        if (_auth?.currentUser != null && _auth!.currentUser!.email == email) {
           print('✅ Sign-in actually successful despite type casting error');
 
           // Ensure user document is properly updated
           if (_isFirestoreAvailable) {
             try {
-              await _updateUserDocumentSafely(_auth.currentUser!);
+              await _updateUserDocumentSafely(_auth!.currentUser!);
             } catch (docError) {
               print(
                 '⚠️ User document update failed after type cast error: $docError',
@@ -344,7 +344,7 @@ class FirebaseService {
     try {
       print('🔄 Starting email registration for: $email');
 
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
+      UserCredential result = await auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -399,7 +399,7 @@ class FirebaseService {
         );
 
         // The registration might have been successful despite the error
-        if (_auth.currentUser != null && _auth.currentUser!.email == email) {
+        if (_auth?.currentUser != null && _auth!.currentUser!.email == email) {
           print(
             '✅ Registration actually successful despite type casting error',
           );
@@ -407,7 +407,7 @@ class FirebaseService {
           // Ensure user document is created even with type casting error
           if (_isFirestoreAvailable) {
             try {
-              await _createUserDocumentWithRetry(_auth.currentUser!);
+              await _createUserDocumentWithRetry(_auth!.currentUser!);
             } catch (docError) {
               print(
                 '⚠️ User document creation failed after type cast error: $docError',
@@ -468,7 +468,7 @@ class FirebaseService {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _auth.signInWithCredential(credential);
+      final userCredential = await auth.signInWithCredential(credential);
       print('✅ Google Sign-In successful for: ${userCredential.user?.email}');
 
       // Check Firestore connection and update/create user document
@@ -498,13 +498,13 @@ class FirebaseService {
         );
 
         // The authentication was actually successful, just the return type casting failed
-        if (_auth.currentUser != null) {
+        if (_auth?.currentUser != null) {
           print('✅ Authentication still successful despite type casting error');
 
           // Ensure user document is properly created/updated
           if (_isFirestoreAvailable) {
             try {
-              await _updateUserDocumentSafely(_auth.currentUser!);
+              await _updateUserDocumentSafely(_auth!.currentUser!);
             } catch (docError) {
               print(
                 '⚠️ User document update failed after type cast error: $docError',
@@ -516,7 +516,7 @@ class FirebaseService {
           await _setupAdminUserAfterAuth();
 
           // Return success even though there was a type casting error
-          return Future.value(_auth.currentUser as UserCredential);
+          return Future.value(auth.currentUser as UserCredential);
         }
       }
 
@@ -530,7 +530,7 @@ class FirebaseService {
       print('🔧 Setting up admin user after authentication...');
 
       // Handle admin setup directly without UserDataService dependency
-      final currentUser = _auth.currentUser;
+      final currentUser = _auth?.currentUser;
       if (currentUser != null && _isFirestoreAvailable) {
         try {
           // Check if user document exists and create/update if needed
@@ -702,7 +702,7 @@ class FirebaseService {
   Future<void> signOut() async {
     try {
       await _googleSignIn.signOut();
-      await _auth.signOut();
+      await auth.signOut();
       print('✅ User signed out successfully');
     } catch (e) {
       print('❌ Error signing out: $e');
@@ -1091,7 +1091,7 @@ class FirebaseService {
       }
 
       // Prevent self-demotion
-      if (_auth.currentUser?.email?.toLowerCase() == email.toLowerCase()) {
+      if (_auth?.currentUser?.email?.toLowerCase() == email.toLowerCase()) {
         throw Exception('You cannot revoke your own admin privileges');
       }
 

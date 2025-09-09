@@ -178,7 +178,7 @@ class FirebaseService {
     try {
       final user = _auth?.currentUser;
       if (user != null && _isFirestoreAvailable) {
-        await _firestore.collection('users').doc(user.uid).update({
+        await firestore.collection('users').doc(user.uid).update({
           'fcmToken': token,
           'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
         });
@@ -918,7 +918,7 @@ class FirebaseService {
 
   /// Get stocks collection
   Stream<QuerySnapshot> getStocks() {
-    return _firestore.collection('stocks').orderBy('symbol').snapshots();
+    return firestore.collection('stocks').orderBy('symbol').snapshots();
   }
 
   /// Get news collection

@@ -104,6 +104,8 @@ class _AIStockSummaryAppState extends State<AIStockSummaryApp> {
   void initState() {
     super.initState();
     _languageStreamController = StreamController<String>.broadcast();
+    // Ensure Android 13+ notifications permission is requested
+    FirebaseService().ensureAndroidNotificationPermission();
   }
 
   @override
@@ -1063,6 +1065,10 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
+  bool _isGenerating = false;
+  String? _typingText;
+  String? _fullSummary;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1199,6 +1205,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               ],
             ),
             const SizedBox(height: 8),
+            _buildHeaderRowWithMiniChart(stockId),
+            const SizedBox(height: 8),
             _buildSummaryContent(stockId),
             const SizedBox(height: 12),
             ElevatedButton.icon(
@@ -1224,6 +1232,22 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             .doc(stockId)
             .snapshots(),
         builder: (context, summarySnapshot) {
+          if (_isGenerating) {
+            return Row(
+              children: const [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                ),
+                SizedBox(width: 8),
+                Text('Generating summary...')
+              ],
+            );
+          }
+          if (_typingText != null) {
+            return _buildSummaryContainer(_typingText!, smallInfo: null);
+          }
           if (summarySnapshot.connectionState == ConnectionState.waiting) {
             return const SizedBox.shrink();
           }
@@ -1313,29 +1337,121 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   void _generateAISummary(BuildContext context, String stockId) async {
     try {
+      setState(() {
+        _isGenerating = true;
+        _typingText = null;
+        _fullSummary = null;
+      });
       final content = await StockService().generateAISummary(stockId);
       if (!mounted) return;
-      await showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('AI Summary — $stockId'),
-          content: SingleChildScrollView(child: Text(content)),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
-          ],
-        ),
-      );
+      setState(() {
+        _isGenerating = false;
+        _fullSummary = content;
+      });
+      // Typewriter reveal
+      await _typewriterReveal(content);
       if (!mounted) return;
-      setState(() {}); // trigger refresh to pull latest summary
+      setState(() {}); // refresh to keep state
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        _isGenerating = false;
+        _typingText = null;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('AI summary failed: $e')),
       );
     }
   }
 
+  Future<void> _typewriterReveal(String fullText) async {
+    const int millisPerChar = 15; // adjust speed
+    _typingText = '';
+    for (int i = 0; i <= fullText.length; i++) {
+      if (!mounted) return;
+      setState(() {
+        _typingText = fullText.substring(0, i);
+      });
+      await Future.delayed(const Duration(milliseconds: millisPerChar));
+    }
+  }
+
+  Widget _buildHeaderRowWithMiniChart(String symbol) {
+    return FutureBuilder<Stock>(
+      future: StockService().getStock(symbol),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox(height: 32);
+        }
+        final stock = snapshot.data!;
+        final isUp = stock.isPositiveChange;
+        final color = isUp ? Colors.green : Colors.red;
+        final chart = stock.chart;
+        final points = (chart?.dataPoints ?? []);
+        List<Widget> rowChildren = [
+          Expanded(
+            child: SizedBox(
+              height: 36,
+              child: points.isEmpty
+                  ? const SizedBox.shrink()
+                  : CustomPaint(
+                      painter: _MiniSparklinePainter(points.map((e) => e.close).toList(), color),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(stock.formattedPrice, style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                '${stock.formattedChange} (${stock.formattedChangePercent})',
+                style: TextStyle(color: color, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ];
+        return Row(children: rowChildren);
+      },
+    );
+  }
+
   // Simple empty state widget
+}
+
+class _MiniSparklinePainter extends CustomPainter {
+  _MiniSparklinePainter(this.values, this.color);
+  final List<double> values;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+    final minV = values.reduce((a, b) => a < b ? a : b);
+    final maxV = values.reduce((a, b) => a > b ? a : b);
+    final range = (maxV - minV).abs() < 1e-6 ? 1.0 : (maxV - minV);
+    final path = Path();
+    for (int i = 0; i < values.length; i++) {
+      final x = size.width * (i / (values.length - 1));
+      final y = size.height - ((values[i] - minV) / range) * size.height;
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniSparklinePainter oldDelegate) {
+    return oldDelegate.values != values || oldDelegate.color != color;
+  }
 }
 
 class _EmptyFavorites extends StatelessWidget {

@@ -102,6 +102,23 @@ class FirebaseService {
     }
   }
 
+  /// Prompt Android 13+ POST_NOTIFICATIONS runtime permission if needed
+  Future<void> ensureAndroidNotificationPermission() async {
+    try {
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.notDetermined ||
+          settings.authorizationStatus == AuthorizationStatus.denied) {
+        await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+    } catch (e) {
+      print('⚠️ ensureAndroidNotificationPermission error: $e');
+    }
+  }
+
   /// Get FCM registration token safely (as per Firebase documentation)
   Future<void> _getFCMTokenSafely() async {
     try {

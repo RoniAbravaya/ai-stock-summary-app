@@ -14,14 +14,11 @@ class FirebaseService {
   factory FirebaseService() => _instance;
   FirebaseService._internal();
 
-  // Firebase instances
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(
-    app: Firebase.app(),
-    databaseId: 'flutter-database',
-  );
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  // Firebase instances (lazy to avoid crashes in tests where Firebase isn't initialized)
+  FirebaseAuth? _auth;
+  FirebaseFirestore? _firestore;
+  FirebaseMessaging? _messaging;
+  FirebaseStorage? _storage;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Connection status
@@ -30,12 +27,46 @@ class FirebaseService {
   final bool _isAuthAvailable = true; // Added for Google Sign-In
 
   // Getters
-  FirebaseAuth get auth => _auth;
-  FirebaseFirestore get firestore => _firestore;
-  FirebaseMessaging get messaging => _messaging;
-  FirebaseStorage get storage => _storage;
-  User? get currentUser => _auth.currentUser;
-  bool get isSignedIn => _auth.currentUser != null;
+  FirebaseAuth get auth {
+    if (_auth != null) return _auth!;
+    if (Firebase.apps.isEmpty) {
+      throw Exception('Firebase not initialized. Call Firebase.initializeApp() first.');
+    }
+    _auth = FirebaseAuth.instance;
+    return _auth!;
+  }
+
+  FirebaseFirestore get firestore {
+    if (_firestore != null) return _firestore!;
+    if (Firebase.apps.isEmpty) {
+      throw Exception('Firebase not initialized. Call Firebase.initializeApp() first.');
+    }
+    _firestore = FirebaseFirestore.instanceFor(
+      app: Firebase.app(),
+      databaseId: 'flutter-database',
+    );
+    return _firestore!;
+  }
+
+  FirebaseMessaging get messaging {
+    if (_messaging != null) return _messaging!;
+    if (Firebase.apps.isEmpty) {
+      throw Exception('Firebase not initialized. Call Firebase.initializeApp() first.');
+    }
+    _messaging = FirebaseMessaging.instance;
+    return _messaging!;
+  }
+
+  FirebaseStorage get storage {
+    if (_storage != null) return _storage!;
+    if (Firebase.apps.isEmpty) {
+      throw Exception('Firebase not initialized. Call Firebase.initializeApp() first.');
+    }
+    _storage = FirebaseStorage.instance;
+    return _storage!;
+  }
+  User? get currentUser => _auth?.currentUser;
+  bool get isSignedIn => _auth?.currentUser != null;
   bool get isFirestoreAvailable => _isFirestoreAvailable;
 
   /// Initialize Firebase services
@@ -63,6 +94,10 @@ class FirebaseService {
   /// Initialize Firebase Cloud Messaging according to documentation
   Future<void> _initializeFCM() async {
     try {
+      if (Firebase.apps.isEmpty) {
+        // In tests or pre-init environments, skip
+        return;
+      }
       print('🔧 Initializing Firebase Cloud Messaging...');
 
       // Request notification permissions
@@ -102,6 +137,24 @@ class FirebaseService {
     }
   }
 
+  /// Prompt Android 13+ POST_NOTIFICATIONS runtime permission if needed
+  Future<void> ensureAndroidNotificationPermission() async {
+    try {
+      if (Firebase.apps.isEmpty) return; // Skip in tests where Firebase is not initialized
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.notDetermined ||
+          settings.authorizationStatus == AuthorizationStatus.denied) {
+        await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+    } catch (e) {
+      print('⚠️ ensureAndroidNotificationPermission error: $e');
+    }
+  }
+
   /// Get FCM registration token safely (as per Firebase documentation)
   Future<void> _getFCMTokenSafely() async {
     try {
@@ -123,9 +176,9 @@ class FirebaseService {
   /// Store FCM token in user document for admin notifications
   Future<void> _storeFCMToken(String token) async {
     try {
-      final user = _auth.currentUser;
+      final user = _auth?.currentUser;
       if (user != null && _isFirestoreAvailable) {
-        await _firestore.collection('users').doc(user.uid).update({
+        await firestore.collection('users').doc(user.uid).update({
           'fcmToken': token,
           'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
         });
@@ -166,6 +219,11 @@ class FirebaseService {
   /// Check if Firestore is available and responsive
   Future<void> _checkFirestoreConnection() async {
     try {
+      if (Firebase.apps.isEmpty) {
+        _isFirestoreAvailable = false;
+        print('⚠️ Firestore not available: Firebase not initialized');
+        return;
+      }
       // Only check connection every 30 seconds to avoid repeated checks
       if (_lastConnectionCheck != null &&
           DateTime.now().difference(_lastConnectionCheck!).inSeconds < 30) {
@@ -175,7 +233,7 @@ class FirebaseService {
       _lastConnectionCheck = DateTime.now();
 
       // Try to read from Firestore with timeout
-      await _firestore
+      await firestore
           .collection('_health')
           .doc('check')
           .get()
@@ -193,7 +251,7 @@ class FirebaseService {
   Future<UserCredential?> signInWithEmail(String email, String password) async {
     try {
       // Add better error handling for type casting issues
-      UserCredential result = await _auth.signInWithEmailAndPassword(
+      UserCredential result = await auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -229,13 +287,13 @@ class FirebaseService {
       if (e.toString().contains('PigeonUserDetails') ||
           e.toString().contains('type cast')) {
         // Check if authentication was actually successful
-        if (_auth.currentUser != null && _auth.currentUser!.email == email) {
+        if (_auth?.currentUser != null && _auth!.currentUser!.email == email) {
           print('✅ Sign-in actually successful despite type casting error');
 
           // Ensure user document is properly updated
           if (_isFirestoreAvailable) {
             try {
-              await _updateUserDocumentSafely(_auth.currentUser!);
+              await _updateUserDocumentSafely(_auth!.currentUser!);
             } catch (docError) {
               print(
                 '⚠️ User document update failed after type cast error: $docError',
@@ -286,7 +344,7 @@ class FirebaseService {
     try {
       print('🔄 Starting email registration for: $email');
 
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
+      UserCredential result = await auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -341,7 +399,7 @@ class FirebaseService {
         );
 
         // The registration might have been successful despite the error
-        if (_auth.currentUser != null && _auth.currentUser!.email == email) {
+        if (_auth?.currentUser != null && _auth!.currentUser!.email == email) {
           print(
             '✅ Registration actually successful despite type casting error',
           );
@@ -349,7 +407,7 @@ class FirebaseService {
           // Ensure user document is created even with type casting error
           if (_isFirestoreAvailable) {
             try {
-              await _createUserDocumentWithRetry(_auth.currentUser!);
+              await _createUserDocumentWithRetry(_auth!.currentUser!);
             } catch (docError) {
               print(
                 '⚠️ User document creation failed after type cast error: $docError',
@@ -410,7 +468,7 @@ class FirebaseService {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _auth.signInWithCredential(credential);
+      final userCredential = await auth.signInWithCredential(credential);
       print('✅ Google Sign-In successful for: ${userCredential.user?.email}');
 
       // Check Firestore connection and update/create user document
@@ -440,13 +498,13 @@ class FirebaseService {
         );
 
         // The authentication was actually successful, just the return type casting failed
-        if (_auth.currentUser != null) {
+        if (_auth?.currentUser != null) {
           print('✅ Authentication still successful despite type casting error');
 
           // Ensure user document is properly created/updated
           if (_isFirestoreAvailable) {
             try {
-              await _updateUserDocumentSafely(_auth.currentUser!);
+              await _updateUserDocumentSafely(_auth!.currentUser!);
             } catch (docError) {
               print(
                 '⚠️ User document update failed after type cast error: $docError',
@@ -458,7 +516,7 @@ class FirebaseService {
           await _setupAdminUserAfterAuth();
 
           // Return success even though there was a type casting error
-          return Future.value(_auth.currentUser as UserCredential);
+          return Future.value(auth.currentUser as UserCredential);
         }
       }
 
@@ -472,11 +530,11 @@ class FirebaseService {
       print('🔧 Setting up admin user after authentication...');
 
       // Handle admin setup directly without UserDataService dependency
-      final currentUser = _auth.currentUser;
+      final currentUser = _auth?.currentUser;
       if (currentUser != null && _isFirestoreAvailable) {
         try {
           // Check if user document exists and create/update if needed
-          DocumentSnapshot userDoc = await _firestore
+          DocumentSnapshot userDoc = await firestore
               .collection('users')
               .doc(currentUser.uid)
               .get()
@@ -491,7 +549,7 @@ class FirebaseService {
             if (currentUser.email?.toLowerCase() == 'erolrony91@gmail.com' &&
                 userData?['role'] != 'admin') {
               print('🔧 Promoting erolrony91@gmail.com to admin...');
-              await _firestore
+              await firestore
                   .collection('users')
                   .doc(currentUser.uid)
                   .update({
@@ -528,7 +586,7 @@ class FirebaseService {
 
       for (int attempt = 0; attempt < 2; attempt++) {
         try {
-          userDoc = await _firestore
+          userDoc = await firestore
               .collection('users')
               .doc(user.uid)
               .get()
@@ -548,7 +606,7 @@ class FirebaseService {
       if (!userDoc.exists) {
         await _createUserDocumentSafely(user);
       } else {
-        await _firestore
+        await firestore
             .collection('users')
             .doc(user.uid)
             .update({
@@ -575,7 +633,7 @@ class FirebaseService {
       // Check if this is the first user (admin) with better error handling
       bool isFirstUser = false;
       try {
-        QuerySnapshot users = await _firestore
+        QuerySnapshot users = await firestore
             .collection('users')
             .limit(1)
             .get()
@@ -621,7 +679,7 @@ class FirebaseService {
         '📝 User data to save: ${userData.toString().replaceAll(RegExp(r'FieldValue.*'), 'FieldValue')}',
       );
 
-      await _firestore
+      await firestore
           .collection('users')
           .doc(user.uid)
           .set(userData)
@@ -644,7 +702,7 @@ class FirebaseService {
   Future<void> signOut() async {
     try {
       await _googleSignIn.signOut();
-      await _auth.signOut();
+      await auth.signOut();
       print('✅ User signed out successfully');
     } catch (e) {
       print('❌ Error signing out: $e');
@@ -664,7 +722,7 @@ class FirebaseService {
       bool isFirstUser = await _isFirstUser();
       String userRole = isFirstUser ? 'admin' : 'user';
 
-      await _firestore
+      await firestore
           .collection('users')
           .doc(user.uid)
           .set({
@@ -695,7 +753,7 @@ class FirebaseService {
   /// Check if this is the first user in the system
   Future<bool> _isFirstUser() async {
     try {
-      QuerySnapshot users = await _firestore
+      QuerySnapshot users = await firestore
           .collection('users')
           .limit(1)
           .get()
@@ -715,7 +773,7 @@ class FirebaseService {
     }
 
     try {
-      DocumentSnapshot userDoc = await _firestore
+      DocumentSnapshot userDoc = await firestore
           .collection('users')
           .doc(user.uid)
           .get()
@@ -724,7 +782,7 @@ class FirebaseService {
       if (!userDoc.exists) {
         await _createUserDocument(user);
       } else {
-        await _firestore
+        await firestore
             .collection('users')
             .doc(user.uid)
             .update({
@@ -751,7 +809,7 @@ class FirebaseService {
     }
 
     try {
-      return await _firestore
+      return await firestore
           .collection('users')
           .doc(currentUser!.uid)
           .get()
@@ -771,7 +829,7 @@ class FirebaseService {
       throw Exception('Firestore unavailable');
     }
 
-    await _firestore
+    await firestore
         .collection('users')
         .doc(currentUser!.uid)
         .update({...data, 'updatedAt': FieldValue.serverTimestamp()})
@@ -784,7 +842,7 @@ class FirebaseService {
       if (currentUser == null) return false;
 
       // Prefer checking the user document role which aligns with Firestore rules
-      final doc = await _firestore
+      final doc = await firestore
           .collection('users')
           .doc(currentUser!.uid)
           .get()
@@ -820,7 +878,7 @@ class FirebaseService {
       throw Exception('Firestore unavailable');
     }
 
-    await _firestore
+    await firestore
         .collection('favorites')
         .doc(currentUser!.uid)
         .collection('stocks')
@@ -837,7 +895,7 @@ class FirebaseService {
       throw Exception('Firestore unavailable');
     }
 
-    await _firestore
+    await firestore
         .collection('favorites')
         .doc(currentUser!.uid)
         .collection('stocks')
@@ -850,7 +908,7 @@ class FirebaseService {
   Stream<QuerySnapshot> getFavoriteStocks() {
     if (currentUser == null) throw Exception('No user signed in');
 
-    return _firestore
+    return firestore
         .collection('favorites')
         .doc(currentUser!.uid)
         .collection('stocks')
@@ -860,12 +918,12 @@ class FirebaseService {
 
   /// Get stocks collection
   Stream<QuerySnapshot> getStocks() {
-    return _firestore.collection('stocks').orderBy('symbol').snapshots();
+    return firestore.collection('stocks').orderBy('symbol').snapshots();
   }
 
   /// Get news collection
   Stream<QuerySnapshot> getNews() {
-    return _firestore
+    return firestore
         .collection('news')
         .orderBy('publishedAt', descending: true)
         .limit(50)
@@ -874,7 +932,7 @@ class FirebaseService {
 
   /// Get AI summary for a stock
   Future<DocumentSnapshot> getStockSummary(String stockId) async {
-    return await _firestore
+    return await firestore
         .collection('summaries')
         .doc(stockId)
         .get()
@@ -998,7 +1056,7 @@ class FirebaseService {
 
       // Find the user by email
       QuerySnapshot userQuery =
-          await _firestore
+          await firestore
               .collection('users')
               .where('email', isEqualTo: email.toLowerCase().trim())
               .limit(1)
@@ -1033,13 +1091,13 @@ class FirebaseService {
       }
 
       // Prevent self-demotion
-      if (_auth.currentUser?.email?.toLowerCase() == email.toLowerCase()) {
+      if (_auth?.currentUser?.email?.toLowerCase() == email.toLowerCase()) {
         throw Exception('You cannot revoke your own admin privileges');
       }
 
       // Find the user by email
       QuerySnapshot userQuery =
-          await _firestore
+          await firestore
               .collection('users')
               .where('email', isEqualTo: email.toLowerCase().trim())
               .limit(1)

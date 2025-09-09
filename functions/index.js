@@ -14,7 +14,7 @@ admin.initializeApp();
  * Process notification document created in admin_notifications collection
  */
 exports.processNotification = onDocumentCreated(
-  { document: "admin_notifications/{notificationId}", database: "projects/_/databases/flutter-database" },
+  { document: "admin_notifications/{notificationId}", database: "flutter-database" },
   async (event) => {
     try {
       // Debug the entire event structure first

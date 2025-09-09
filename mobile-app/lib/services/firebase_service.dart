@@ -233,7 +233,7 @@ class FirebaseService {
       _lastConnectionCheck = DateTime.now();
 
       // Try to read from Firestore with timeout
-      await _firestore
+      await firestore
           .collection('_health')
           .doc('check')
           .get()
@@ -534,7 +534,7 @@ class FirebaseService {
       if (currentUser != null && _isFirestoreAvailable) {
         try {
           // Check if user document exists and create/update if needed
-          DocumentSnapshot userDoc = await _firestore
+          DocumentSnapshot userDoc = await firestore
               .collection('users')
               .doc(currentUser.uid)
               .get()
@@ -549,7 +549,7 @@ class FirebaseService {
             if (currentUser.email?.toLowerCase() == 'erolrony91@gmail.com' &&
                 userData?['role'] != 'admin') {
               print('🔧 Promoting erolrony91@gmail.com to admin...');
-              await _firestore
+              await firestore
                   .collection('users')
                   .doc(currentUser.uid)
                   .update({
@@ -586,7 +586,7 @@ class FirebaseService {
 
       for (int attempt = 0; attempt < 2; attempt++) {
         try {
-          userDoc = await _firestore
+          userDoc = await firestore
               .collection('users')
               .doc(user.uid)
               .get()
@@ -606,7 +606,7 @@ class FirebaseService {
       if (!userDoc.exists) {
         await _createUserDocumentSafely(user);
       } else {
-        await _firestore
+        await firestore
             .collection('users')
             .doc(user.uid)
             .update({
@@ -633,7 +633,7 @@ class FirebaseService {
       // Check if this is the first user (admin) with better error handling
       bool isFirstUser = false;
       try {
-        QuerySnapshot users = await _firestore
+        QuerySnapshot users = await firestore
             .collection('users')
             .limit(1)
             .get()
@@ -679,7 +679,7 @@ class FirebaseService {
         '📝 User data to save: ${userData.toString().replaceAll(RegExp(r'FieldValue.*'), 'FieldValue')}',
       );
 
-      await _firestore
+      await firestore
           .collection('users')
           .doc(user.uid)
           .set(userData)
@@ -722,7 +722,7 @@ class FirebaseService {
       bool isFirstUser = await _isFirstUser();
       String userRole = isFirstUser ? 'admin' : 'user';
 
-      await _firestore
+      await firestore
           .collection('users')
           .doc(user.uid)
           .set({
@@ -753,7 +753,7 @@ class FirebaseService {
   /// Check if this is the first user in the system
   Future<bool> _isFirstUser() async {
     try {
-      QuerySnapshot users = await _firestore
+      QuerySnapshot users = await firestore
           .collection('users')
           .limit(1)
           .get()
@@ -773,7 +773,7 @@ class FirebaseService {
     }
 
     try {
-      DocumentSnapshot userDoc = await _firestore
+      DocumentSnapshot userDoc = await firestore
           .collection('users')
           .doc(user.uid)
           .get()
@@ -782,7 +782,7 @@ class FirebaseService {
       if (!userDoc.exists) {
         await _createUserDocument(user);
       } else {
-        await _firestore
+        await firestore
             .collection('users')
             .doc(user.uid)
             .update({
@@ -809,7 +809,7 @@ class FirebaseService {
     }
 
     try {
-      return await _firestore
+      return await firestore
           .collection('users')
           .doc(currentUser!.uid)
           .get()
@@ -829,7 +829,7 @@ class FirebaseService {
       throw Exception('Firestore unavailable');
     }
 
-    await _firestore
+    await firestore
         .collection('users')
         .doc(currentUser!.uid)
         .update({...data, 'updatedAt': FieldValue.serverTimestamp()})
@@ -842,7 +842,7 @@ class FirebaseService {
       if (currentUser == null) return false;
 
       // Prefer checking the user document role which aligns with Firestore rules
-      final doc = await _firestore
+      final doc = await firestore
           .collection('users')
           .doc(currentUser!.uid)
           .get()
@@ -878,7 +878,7 @@ class FirebaseService {
       throw Exception('Firestore unavailable');
     }
 
-    await _firestore
+    await firestore
         .collection('favorites')
         .doc(currentUser!.uid)
         .collection('stocks')
@@ -895,7 +895,7 @@ class FirebaseService {
       throw Exception('Firestore unavailable');
     }
 
-    await _firestore
+    await firestore
         .collection('favorites')
         .doc(currentUser!.uid)
         .collection('stocks')
@@ -908,7 +908,7 @@ class FirebaseService {
   Stream<QuerySnapshot> getFavoriteStocks() {
     if (currentUser == null) throw Exception('No user signed in');
 
-    return _firestore
+    return firestore
         .collection('favorites')
         .doc(currentUser!.uid)
         .collection('stocks')
@@ -923,7 +923,7 @@ class FirebaseService {
 
   /// Get news collection
   Stream<QuerySnapshot> getNews() {
-    return _firestore
+    return firestore
         .collection('news')
         .orderBy('publishedAt', descending: true)
         .limit(50)
@@ -932,7 +932,7 @@ class FirebaseService {
 
   /// Get AI summary for a stock
   Future<DocumentSnapshot> getStockSummary(String stockId) async {
-    return await _firestore
+    return await firestore
         .collection('summaries')
         .doc(stockId)
         .get()
@@ -1056,7 +1056,7 @@ class FirebaseService {
 
       // Find the user by email
       QuerySnapshot userQuery =
-          await _firestore
+          await firestore
               .collection('users')
               .where('email', isEqualTo: email.toLowerCase().trim())
               .limit(1)
@@ -1097,7 +1097,7 @@ class FirebaseService {
 
       // Find the user by email
       QuerySnapshot userQuery =
-          await _firestore
+          await firestore
               .collection('users')
               .where('email', isEqualTo: email.toLowerCase().trim())
               .limit(1)

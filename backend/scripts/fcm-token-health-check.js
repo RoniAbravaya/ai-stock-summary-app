@@ -17,6 +17,7 @@
  */
 
 const admin = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
 const path = require('path');
 
 // Initialize Firebase Admin SDK
@@ -54,7 +55,7 @@ async function checkFCMTokenHealth(verbose = false) {
   try {
     console.log('🔍 Checking FCM token health for all users...');
     
-    const db = admin.firestore();
+    const db = getFirestore(admin.app(), 'flutter-database');
     const usersCollection = db.collection('users');
     const usersSnapshot = await usersCollection.get();
 
@@ -144,7 +145,7 @@ async function triggerFCMTokenRefresh(usersWithoutTokens) {
       return { success: true, message: 'No users need refresh' };
     }
 
-    const db = admin.firestore();
+    const db = getFirestore(admin.app(), 'flutter-database');
     const batch = db.batch();
     
     // Mark users for FCM token refresh

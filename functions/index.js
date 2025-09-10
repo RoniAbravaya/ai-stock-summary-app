@@ -77,6 +77,9 @@ exports.processNotification = onDocumentCreated({
         case "specific_user":
           await sendToSpecificUser(messaging, notification);
           break;
+        case "specific_users_bulk":
+          await sendToSpecificUsersBulk(messaging, notification);
+          break;
         default:
           logger.error("❌ Unknown notification type:", notificationType);
           return;
@@ -210,6 +213,57 @@ async function sendToSpecificUser(messaging, notification) {
   }
 
   await sendToTokens(messaging, [userData.fcmToken], notification);
+}
+
+/**
+ * Send notification to multiple specific users by user IDs
+ */
+async function sendToSpecificUsersBulk(messaging, notification) {
+  logger.info("📤 Sending to specific users bulk:", notification.targetUserIds?.length || 0);
+
+  if (!notification.targetUserIds || notification.targetUserIds.length === 0) {
+    logger.warn("⚠️ No target user IDs provided for bulk notification");
+    return;
+  }
+
+  const db = getFirestore(admin.app(), "flutter-database");
+  const tokens = [];
+  let usersWithTokens = 0;
+  let usersWithoutTokens = 0;
+
+  // Process users in batches (Firestore 'in' query limit is 10)
+  const batchSize = 10;
+  for (let i = 0; i < notification.targetUserIds.length; i += batchSize) {
+    const batch = notification.targetUserIds.slice(i, i + batchSize);
+    
+    try {
+      const usersSnapshot = await db
+          .collection("users")
+          .where(admin.firestore.FieldPath.documentId(), "in", batch)
+          .get();
+
+      usersSnapshot.forEach((doc) => {
+        const userData = doc.data();
+        if (userData.fcmToken && userData.fcmToken.trim() !== '') {
+          tokens.push(userData.fcmToken);
+          usersWithTokens++;
+        } else {
+          usersWithoutTokens++;
+          logger.warn(`⚠️ User ${userData.email || doc.id} has no FCM token`);
+        }
+      });
+    } catch (batchError) {
+      logger.error("❌ Error processing user batch:", batchError.message);
+    }
+  }
+
+  logger.info(`📊 Bulk notification stats: ${usersWithTokens} users with tokens, ${usersWithoutTokens} without tokens`);
+
+  if (tokens.length > 0) {
+    await sendToTokens(messaging, tokens, notification);
+  } else {
+    logger.warn("⚠️ No users with FCM tokens found for bulk notification");
+  }
 }
 
 /**

@@ -40,6 +40,8 @@ router.get('/', (req, res) => {
       'POST /api/admin/populate-cache - Manually populate cache',
       'GET /api/admin/cache-stats - Get cache statistics',
       'GET /api/admin/scheduler-status - Get scheduler status',
+      'GET /api/admin/fcm-token-health - Check FCM token health',
+      'POST /api/admin/trigger-fcm-refresh - Trigger FCM token refresh',
       'GET /api/users - Get users'
     ],
     timestamp: new Date().toISOString()

@@ -85,9 +85,40 @@ class FirebaseService {
       // Initialize FCM token handling according to Firebase documentation
       await _initializeFCM();
 
+      // Check if FCM token refresh was requested for this user
+      await _checkForFCMRefreshRequest();
+
       print('✅ Firebase services initialized successfully');
     } catch (e) {
       print('❌ Firebase initialization error: $e');
+    }
+  }
+
+  /// Check if FCM token refresh was requested and handle it
+  Future<void> _checkForFCMRefreshRequest() async {
+    try {
+      final user = _auth?.currentUser;
+      if (user == null) return;
+
+      final doc = await firestore.collection('users').doc(user.uid).get();
+      final userData = doc.data();
+      
+      if (userData?['fcmTokenRefreshRequested'] == true) {
+        print('🔄 FCM token refresh was requested for this user');
+        
+        // Force refresh the FCM token
+        await forceFCMTokenUpdate();
+        
+        // Clear the refresh request flag
+        await firestore.collection('users').doc(user.uid).set({
+          'fcmTokenRefreshRequested': false,
+          'fcmTokenRefreshProcessedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        
+        print('✅ FCM token refresh request processed');
+      }
+    } catch (e) {
+      print('⚠️ Error checking FCM refresh request: $e');
     }
   }
 
@@ -260,6 +291,129 @@ class FirebaseService {
     }
   }
 
+  /// Check if current user has FCM token and refresh if missing
+  Future<bool> ensureFCMTokenExists() async {
+    try {
+      final user = _auth?.currentUser;
+      if (user == null || !_isFirestoreAvailable) {
+        print('⚠️ Cannot check FCM token: User not authenticated or Firestore unavailable');
+        return false;
+      }
+
+      print('🔍 Checking if user has FCM token...');
+      
+      // Check current token in Firestore
+      final doc = await firestore.collection('users').doc(user.uid).get();
+      final userData = doc.data();
+      final currentToken = userData?['fcmToken'];
+
+      if (currentToken == null || currentToken.toString().trim().isEmpty) {
+        print('⚠️ User missing FCM token, attempting to refresh...');
+        
+        // Try to get a new token
+        await _getFCMTokenSafely();
+        
+        // Verify the token was stored
+        final updatedDoc = await firestore.collection('users').doc(user.uid).get();
+        final updatedData = updatedDoc.data();
+        final newToken = updatedData?['fcmToken'];
+        
+        if (newToken != null && newToken.toString().trim().isNotEmpty) {
+          print('✅ FCM token successfully refreshed for user');
+          return true;
+        } else {
+          print('❌ Failed to refresh FCM token for user');
+          return false;
+        }
+      } else {
+        print('✅ User already has FCM token');
+        return true;
+      }
+    } catch (e) {
+      print('❌ Error ensuring FCM token exists: $e');
+      return false;
+    }
+  }
+
+  /// Bulk refresh FCM token for users without tokens (admin function)
+  Future<Map<String, dynamic>> refreshMissingFCMTokens() async {
+    try {
+      print('🔧 Starting bulk FCM token refresh...');
+      
+      if (!_isFirestoreAvailable) {
+        throw Exception('Firestore not available');
+      }
+
+      final user = _auth?.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Check if current user is admin
+      final userDoc = await firestore.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
+      if (userData?['role'] != 'admin') {
+        throw Exception('Insufficient permissions - admin role required');
+      }
+
+      int successCount = 0;
+      int failureCount = 0;
+      List<String> processedUsers = [];
+
+      // Get all users without FCM tokens
+      final usersWithoutTokensQuery = await firestore
+          .collection('users')
+          .get();
+
+      for (final doc in usersWithoutTokensQuery.docs) {
+        final userData = doc.data();
+        final fcmToken = userData['fcmToken'];
+        
+        // Skip users who already have tokens
+        if (fcmToken != null && fcmToken.toString().trim().isNotEmpty) {
+          continue;
+        }
+
+        try {
+          // For each user without a token, we can't directly generate their token
+          // as that requires the user's device. Instead, we'll mark them for refresh
+          await firestore.collection('users').doc(doc.id).set({
+            'fcmTokenRefreshRequested': true,
+            'fcmTokenRefreshRequestedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          
+          processedUsers.add(userData['email'] ?? doc.id);
+          successCount++;
+          
+        } catch (e) {
+          print('❌ Failed to mark user ${doc.id} for FCM refresh: $e');
+          failureCount++;
+        }
+      }
+
+      final result = {
+        'success': failureCount == 0,
+        'successCount': successCount,
+        'failureCount': failureCount,
+        'processedUsers': processedUsers,
+        'message': 'Marked $successCount users for FCM token refresh'
+      };
+
+      print('✅ Bulk FCM token refresh completed: $successCount success, $failureCount failures');
+      return result;
+
+    } catch (e) {
+      print('❌ Error in bulk FCM token refresh: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+        'successCount': 0,
+        'failureCount': 0,
+        'processedUsers': [],
+      };
+    }
+  }
+
   /// Check if Firestore is available and responsive
   Future<void> _checkFirestoreConnection() async {
     try {
@@ -311,7 +465,12 @@ class FirebaseService {
       if (_isFirestoreAvailable && result.user != null) {
         try {
           await _updateUserDocumentSafely(result.user!);
-          await _getFCMTokenSafely();
+          
+          // Ensure FCM token exists and refresh if missing
+          final hasToken = await ensureFCMTokenExists();
+          if (!hasToken) {
+            print('⚠️ FCM token refresh failed during sign-in');
+          }
         } catch (firestoreError) {
           print('⚠️ Firestore operations failed: $firestoreError');
           // Don't fail the whole sign-in process for Firestore issues
@@ -521,7 +680,12 @@ class FirebaseService {
       if (_isFirestoreAvailable && userCredential.user != null) {
         try {
           await _updateUserDocumentSafely(userCredential.user!);
-          await _getFCMTokenSafely();
+          
+          // Ensure FCM token exists and refresh if missing
+          final hasToken = await ensureFCMTokenExists();
+          if (!hasToken) {
+            print('⚠️ FCM token refresh failed during Google sign-in');
+          }
         } catch (firestoreError) {
           print('⚠️ Firestore operations failed: $firestoreError');
         }

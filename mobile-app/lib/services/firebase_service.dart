@@ -737,6 +737,15 @@ class FirebaseService {
           if (_isFirestoreAvailable) {
             try {
               await _updateUserDocumentSafely(_auth!.currentUser!);
+              
+              // Store any pending FCM token
+              await _storePendingFCMToken();
+              
+              // Ensure FCM token exists
+              final hasToken = await ensureFCMTokenExists();
+              if (!hasToken) {
+                print('⚠️ FCM token refresh failed after type cast error recovery');
+              }
             } catch (docError) {
               print(
                 '⚠️ User document update failed after type cast error: $docError',

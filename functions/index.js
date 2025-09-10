@@ -80,6 +80,11 @@ exports.processNotification = onDocumentCreated({
         case "specific_users_bulk":
           await sendToSpecificUsersBulk(messaging, notification);
           break;
+        case "admin_system":
+          logger.info("📋 Admin system notification - no FCM delivery needed");
+          // This is an admin system notification for logging/tracking only
+          // No actual FCM messages need to be sent
+          break;
         default:
           logger.error("❌ Unknown notification type:", notificationType);
           return;

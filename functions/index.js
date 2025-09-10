@@ -8,13 +8,19 @@ const {logger} = require("firebase-functions");
 const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
 
-admin.initializeApp();
+// Initialize with explicit project configuration
+admin.initializeApp({
+  projectId: 'new-flutter-ai',
+  databaseURL: 'https://new-flutter-ai-default-rtdb.firebaseio.com'
+});
 
 /**
  * Process notification document created in admin_notifications collection
  */
-exports.processNotification = onDocumentCreated(
-  { document: "admin_notifications/{notificationId}", database: "flutter-database" },
+exports.processNotification = onDocumentCreated({
+  document: "admin_notifications/{notificationId}",
+  database: "flutter-database"
+},
   async (event) => {
     try {
       // Debug the entire event structure first

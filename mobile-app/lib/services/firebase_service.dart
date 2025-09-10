@@ -177,15 +177,38 @@ class FirebaseService {
   Future<void> _storeFCMToken(String token) async {
     try {
       final user = _auth?.currentUser;
-      if (user != null && _isFirestoreAvailable) {
-        await firestore.collection('users').doc(user.uid).update({
-          'fcmToken': token,
-          'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-        });
-        print('✅ FCM token stored in user document');
+      print('🔍 Storing FCM token - User: ${user?.uid}, Firestore: $_isFirestoreAvailable');
+      
+      if (user == null) {
+        print('❌ Cannot store FCM token: User not authenticated');
+        return;
       }
+      
+      if (!_isFirestoreAvailable) {
+        print('❌ Cannot store FCM token: Firestore not available');
+        return;
+      }
+
+      // Use set with merge to ensure the document exists
+      await firestore.collection('users').doc(user.uid).set({
+        'fcmToken': token,
+        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      
+      print('✅ FCM token stored in user document for ${user.email}');
+      
+      // Verify the token was actually stored
+      final doc = await firestore.collection('users').doc(user.uid).get();
+      final storedToken = doc.data()?['fcmToken'];
+      if (storedToken == token) {
+        print('✅ FCM token storage verified');
+      } else {
+        print('⚠️ FCM token storage verification failed');
+      }
+      
     } catch (e) {
       print('❌ Error storing FCM token: $e');
+      print('❌ Error details: ${e.toString()}');
     }
   }
 
@@ -208,11 +231,32 @@ class FirebaseService {
   /// Refresh FCM token for notification re-registration
   Future<void> refreshFCMToken() async {
     try {
+      print('🔄 Starting FCM token refresh...');
       await FirebaseMessaging.instance.deleteToken();
+      await Future.delayed(Duration(seconds: 1)); // Small delay to ensure deletion
       await _getFCMTokenSafely();
       print('✅ FCM token refreshed successfully');
     } catch (e) {
       print('❌ Error refreshing FCM token: $e');
+    }
+  }
+
+  /// Force FCM token update (for debugging)
+  Future<void> forceFCMTokenUpdate() async {
+    try {
+      print('🔧 Forcing FCM token update...');
+      final token = await FirebaseMessaging.instance.getToken(
+        vapidKey: null, // Force refresh
+      );
+      
+      if (token != null) {
+        print('📱 New FCM token obtained: ${token.substring(0, 20)}...');
+        await _storeFCMToken(token);
+      } else {
+        print('❌ Failed to get new FCM token');
+      }
+    } catch (e) {
+      print('❌ Error forcing FCM token update: $e');
     }
   }
 

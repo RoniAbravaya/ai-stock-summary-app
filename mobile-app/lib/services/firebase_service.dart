@@ -204,6 +204,9 @@ class FirebaseService {
     }
   }
 
+  // Store pending FCM token if user is not authenticated yet
+  String? _pendingFCMToken;
+
   /// Store FCM token in user document for admin notifications
   Future<void> _storeFCMToken(String token) async {
     try {
@@ -211,7 +214,8 @@ class FirebaseService {
       print('🔍 Storing FCM token - User: ${user?.uid}, Firestore: $_isFirestoreAvailable');
       
       if (user == null) {
-        print('❌ Cannot store FCM token: User not authenticated');
+        print('⚠️ User not authenticated yet, storing FCM token for later: ${token.substring(0, 20)}...');
+        _pendingFCMToken = token;
         return;
       }
       
@@ -228,6 +232,9 @@ class FirebaseService {
       
       print('✅ FCM token stored in user document for ${user.email}');
       
+      // Clear pending token since it's now stored
+      _pendingFCMToken = null;
+      
       // Verify the token was actually stored
       final doc = await firestore.collection('users').doc(user.uid).get();
       final storedToken = doc.data()?['fcmToken'];
@@ -240,6 +247,16 @@ class FirebaseService {
     } catch (e) {
       print('❌ Error storing FCM token: $e');
       print('❌ Error details: ${e.toString()}');
+    }
+  }
+
+  /// Store any pending FCM token after user authentication
+  Future<void> _storePendingFCMToken() async {
+    if (_pendingFCMToken != null) {
+      print('🔄 Storing pending FCM token after authentication');
+      final token = _pendingFCMToken!;
+      _pendingFCMToken = null; // Clear it first to avoid recursion
+      await _storeFCMToken(token);
     }
   }
 
@@ -466,6 +483,9 @@ class FirebaseService {
         try {
           await _updateUserDocumentSafely(result.user!);
           
+          // Store any pending FCM token first
+          await _storePendingFCMToken();
+          
           // Ensure FCM token exists and refresh if missing
           final hasToken = await ensureFCMTokenExists();
           if (!hasToken) {
@@ -497,6 +517,7 @@ class FirebaseService {
           if (_isFirestoreAvailable) {
             try {
               await _updateUserDocumentSafely(_auth!.currentUser!);
+              await _storePendingFCMToken();
             } catch (docError) {
               print(
                 '⚠️ User document update failed after type cast error: $docError',
@@ -680,6 +701,9 @@ class FirebaseService {
       if (_isFirestoreAvailable && userCredential.user != null) {
         try {
           await _updateUserDocumentSafely(userCredential.user!);
+          
+          // Store any pending FCM token first
+          await _storePendingFCMToken();
           
           // Ensure FCM token exists and refresh if missing
           final hasToken = await ensureFCMTokenExists();

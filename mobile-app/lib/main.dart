@@ -1069,9 +1069,16 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  bool _isGenerating = false;
-  String? _typingText;
-  String? _fullSummary;
+  // Per-stock local state to avoid cross-item bleed of UI and animations
+  final Map<String, bool> _isGeneratingByStock = {};
+  // Local content shown immediately after generation, until server content arrives
+  final Map<String, String> _localSummaryByStock = {};
+  // For each stock, the server summary's updatedAt must be after this time to supersede local content
+  final Map<String, DateTime> _waitServerUpdatedAfter = {};
+  // Cache stock header futures to prevent repeated fetches during rebuilds
+  final Map<String, Future<Stock>> _stockFutureCache = {};
+  // Optional: cache summary streams (reduces rebuild-side re-subscription churn)
+  final Map<String, Stream<DocumentSnapshot>> _summaryStreams = {};
 
   @override
   Widget build(BuildContext context) {
@@ -1185,7 +1192,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   // Mock content removed; we now rely on Firestore favorites only
 
   Widget _buildFavoriteCard(BuildContext context, String stockId) {
+    final bool isGenerating = _isGeneratingByStock[stockId] ?? false;
     return Card(
+      key: ValueKey<String>(stockId),
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1213,75 +1222,156 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             const SizedBox(height: 8),
             _buildSummaryContent(stockId),
             const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () => _generateAISummary(context, stockId),
-              icon: const Icon(Icons.auto_awesome),
-              label: const Text('Generate AI Summary'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-              ),
-            ),
+            _buildGenerateButton(stockId),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSummaryContent(String stockId) {
-    if (FirebaseService().isFirestoreAvailable) {
-      return StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseService()
-            .firestore
-            .collection('summaries')
-            .doc(stockId)
-            .snapshots(),
-        builder: (context, summarySnapshot) {
-          if (_isGenerating) {
-            return Row(
-              children: const [
-                SizedBox(
+  Widget _buildGenerateButton(String stockId) {
+    final stream = _summaryStreams.putIfAbsent(
+      stockId,
+      () => FirebaseService()
+          .firestore
+          .collection('summaries')
+          .doc(stockId)
+          .snapshots(),
+    );
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: stream,
+      builder: (context, snapshot) {
+        final bool isGenerating = _isGeneratingByStock[stockId] ?? false;
+        bool hasServerSummary = false;
+        try {
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final data = snapshot.data!.data() as Map<String, dynamic>?;
+            final content = (data?['content'] ?? '').toString();
+            hasServerSummary = content.isNotEmpty;
+          }
+        } catch (_) {}
+
+        final hasLocal = (_localSummaryByStock[stockId] ?? '').isNotEmpty;
+        final hasAnySummary = hasServerSummary || hasLocal;
+
+        return ElevatedButton.icon(
+          onPressed: isGenerating ? null : () => _generateAISummary(context, stockId),
+          icon: isGenerating
+              ? const SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2.4),
-                ),
-                SizedBox(width: 8),
-                Text('Generating summary...')
-              ],
-            );
-          }
-          if (_typingText != null) {
-            return _buildSummaryContainer(_typingText!, smallInfo: null);
-          }
-          if (summarySnapshot.connectionState == ConnectionState.waiting) {
-            return const SizedBox.shrink();
-          }
-          if (summarySnapshot.hasData && summarySnapshot.data!.exists) {
-            try {
-              final summary = summarySnapshot.data!.data() as Map<String, dynamic>?;
-              if (summary != null) {
-                final inputs = (summary['inputs'] as Map<String, dynamic>?) ?? {};
-                final priceDesc = (inputs['priceDesc'] as Map<String, dynamic>?) ?? {};
+                )
+              : const Icon(Icons.auto_awesome),
+          label: Text(isGenerating ? 'Generating…' : (hasAnySummary ? 'Regenerate' : 'Generate')),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSummaryContent(String stockId) {
+    if (!FirebaseService().isFirestoreAvailable) {
+      // No Firestore: show nothing per requirement
+      return const SizedBox.shrink();
+    }
+
+    // Prefer a cached stream per stock to avoid unnecessary re-subscriptions on rebuilds
+    final stream = _summaryStreams.putIfAbsent(
+      stockId,
+      () => FirebaseService()
+          .firestore
+          .collection('summaries')
+          .doc(stockId)
+          .snapshots(),
+    );
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: stream,
+      builder: (context, summarySnapshot) {
+        final bool isGenerating = _isGeneratingByStock[stockId] ?? false;
+        final String? localContent = _localSummaryByStock[stockId];
+        
+        // If we have a local freshly-generated content, show it immediately.
+        // If server content is present too and has a newer updatedAt than we started, clear the local copy next frame.
+        if (localContent != null && localContent.isNotEmpty) {
+          try {
+            if (summarySnapshot.hasData && summarySnapshot.data!.exists) {
+              final data = summarySnapshot.data!.data() as Map<String, dynamic>?;
+              final serverUpdatedAt = (data?['updatedAt'] as Timestamp?)?.toDate();
+              final startedAt = _waitServerUpdatedAfter[stockId];
+              if (serverUpdatedAt != null && startedAt != null && serverUpdatedAt.isAfter(startedAt)) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  setState(() {
+                    _localSummaryByStock.remove(stockId);
+                    _waitServerUpdatedAfter.remove(stockId);
+                  });
+                });
+              }
+            }
+          } catch (_) {}
+          return _buildSummaryContainer(localContent, smallInfo: null, refreshedText: 'Refreshed just now');
+        }
+
+        // Otherwise, if server content exists, show it. If regenerating, add a small spinner in header.
+        if (summarySnapshot.hasData && summarySnapshot.data!.exists) {
+          try {
+            final summary = summarySnapshot.data!.data() as Map<String, dynamic>?;
+            if (summary != null) {
+              final inputs = (summary['inputs'] as Map<String, dynamic>?) ?? {};
+              final priceDesc = (inputs['priceDesc'] as Map<String, dynamic>?) ?? {};
+              final content = (summary['content'] ?? '').toString();
+              DateTime? updatedAt;
+              try {
+                final ts = summary['updatedAt'];
+                if (ts is Timestamp) {
+                  updatedAt = ts.toDate();
+                }
+              } catch (_) {}
+              final refreshedText = updatedAt != null
+                  ? _formatRefreshedText(updatedAt, since: _waitServerUpdatedAfter[stockId])
+                  : null;
+              if (content.isNotEmpty) {
                 return _buildSummaryContainer(
-                  summary['content'] ?? 'No summary available',
+                  content,
                   smallInfo: _formatSmallInfo(priceDesc),
+                  refreshedText: refreshedText,
                 );
               }
-            } catch (e) {
-              print('❌ Error parsing summary data: $e');
             }
+          } catch (e) {
+            print('❌ Error parsing summary data: $e');
           }
-          return const Text('No summary generated yet');
-        },
-      );
-    }
-    return const Text('No summary generated yet');
+        }
+
+        // If generating and no content to show yet, display spinner
+        if (isGenerating) {
+          return const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          );
+        }
+
+        if (summarySnapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+
+        // Requirement: empty if no summary
+        return const SizedBox.shrink();
+      },
+    );
   }
 
   Widget _buildMockSummaryContent(String stockId) {
     return const Text('No summary generated yet');
   }
 
-  Widget _buildSummaryContainer(String content, {String? smallInfo}) {
+  Widget _buildSummaryContainer(String content, {String? smallInfo, String? refreshedText}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -1295,9 +1385,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'AI Summary',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Row(
+                children: const [
+                  Icon(Icons.auto_awesome, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'AI Summary',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
               if (smallInfo != null && smallInfo.isNotEmpty)
                 Text(
@@ -1306,8 +1402,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
             ],
           ),
+          if (refreshedText != null && refreshedText.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              refreshedText,
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            ),
+          ],
           const SizedBox(height: 6),
-          Text(content),
+          SelectableText(
+            content,
+            style: const TextStyle(height: 1.35),
+          ),
         ],
       ),
     );
@@ -1325,16 +1431,33 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
   }
 
+  String _formatRefreshedText(DateTime updatedAt, {DateTime? since}) {
+    try {
+      if (since != null && updatedAt.isAfter(since)) {
+        return 'Refreshed just now';
+      }
+      final now = DateTime.now();
+      final diff = now.difference(updatedAt);
+      if (diff.inSeconds < 30) return 'Refreshed just now';
+      if (diff.inMinutes < 1) return 'Refreshed ${diff.inSeconds}s ago';
+      if (diff.inMinutes < 60) return 'Refreshed ${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return 'Refreshed ${diff.inHours}h ago';
+      return 'Refreshed ${diff.inDays}d ago';
+    } catch (_) {
+      return '';
+    }
+  }
+
   void _removeFromFavorites(BuildContext context, String stockId) async {
     try {
       // Use Firestore for real-time sync
       await FirebaseService().removeFromFavorites(stockId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(this.context)
           .showSnackBar(const SnackBar(content: Text('Removed from favorites')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(this.context)
           .showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
   }
@@ -1342,47 +1465,37 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   void _generateAISummary(BuildContext context, String stockId) async {
     try {
       setState(() {
-        _isGenerating = true;
-        _typingText = null;
-        _fullSummary = null;
+        _isGeneratingByStock[stockId] = true;
       });
-      final content = await StockService().generateAISummary(stockId);
+      final lang = LanguageService().currentLanguage;
+      final content = await StockService().generateAISummary(stockId, language: lang);
       if (!mounted) return;
+      // Immediately show local content while waiting for Firestore stream
       setState(() {
-        _isGenerating = false;
-        _fullSummary = content;
+        _localSummaryByStock[stockId] = content;
+        _isGeneratingByStock[stockId] = false;
+        _waitServerUpdatedAfter[stockId] = DateTime.now().subtract(const Duration(milliseconds: 250));
       });
-      // Typewriter reveal
-      await _typewriterReveal(content);
-      if (!mounted) return;
-      setState(() {}); // refresh to keep state
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _isGenerating = false;
-        _typingText = null;
+        _isGeneratingByStock[stockId] = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(this.context).showSnackBar(
         SnackBar(content: Text('AI summary failed: $e')),
       );
     }
   }
 
-  Future<void> _typewriterReveal(String fullText) async {
-    const int millisPerChar = 15; // adjust speed
-    _typingText = '';
-    for (int i = 0; i <= fullText.length; i++) {
-      if (!mounted) return;
-      setState(() {
-        _typingText = fullText.substring(0, i);
-      });
-      await Future.delayed(const Duration(milliseconds: millisPerChar));
-    }
-  }
+  // Removed typewriter animation as per request
 
   Widget _buildHeaderRowWithMiniChart(String symbol) {
+    final future = _stockFutureCache.putIfAbsent(
+      symbol,
+      () => StockService().getStock(symbol),
+    );
     return FutureBuilder<Stock>(
-      future: StockService().getStock(symbol),
+      future: future,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const SizedBox(height: 32);

@@ -119,15 +119,31 @@ router.post('/generate', async (req, res) => {
       url: a.url,
     }));
 
-    const systemPrompt = `You are a concise equity research assistant. Use the provided recent price action and latest news headlines to write a short, plain‑English summary and a balanced near‑term outlook. Avoid hype, keep it specific to the ticker.`;
+    const systemPrompt = `You are a Finance & Economics specialist. Produce user-friendly, plain-English equity commentary grounded in recent price movements and the latest news. Be specific to the ticker, balanced, and non-promotional. Avoid generic advice; focus on what moved the stock and what could matter next.`;
 
     const userPrompt = {
       role: 'user',
       content: [
-        { type: 'text', text: `Ticker: ${ticker}\nName: ${stock.name || ''}\n` },
-        { type: 'text', text: `Price data (recent): ${JSON.stringify(priceDesc)}\n` },
-        { type: 'text', text: `News (latest up to 5): ${JSON.stringify(newsDesc)}\n` },
-        { type: 'text', text: `Write 2 sections:\n1) Summary (2-4 sentences)\n2) Near-term outlook (bulleted, 2-3 bullets)\nKeep under 120 words total. If data is thin, say so.` }
+        { type: 'text', text: `Respond in language: ${language}` },
+        { type: 'text', text: `Ticker: ${ticker}\nName: ${stock.name || ''}` },
+        { type: 'text', text: `Price (recent window): ${JSON.stringify(priceDesc)}` },
+        { type: 'text', text: `Latest news (up to 5): ${JSON.stringify(newsDesc)}` },
+        { type: 'text', text: `Write using this layout and tone (emoji headers, short bullets):
+
+📊 Where it is now
+- Price (approximate) and placement vs 52w range
+- If available: brief consensus 12m view
+
+✅ Good news
+- 3–5 concise, positive drivers tied to price/news
+
+⚠️ Things to watch
+- 3–5 concise risks/watch-outs tied to price/news
+
+👉 In short
+- 1 short, balanced sentence synthesizing the setup
+
+Keep it specific to ${ticker}. Refer to price/news provided. Use plain English. No investment advice.` }
       ]
     };
 

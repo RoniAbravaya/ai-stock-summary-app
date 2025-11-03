@@ -11,7 +11,26 @@ const schedulerService = require('../services/schedulerService');
 const newsCacheService = require('../services/newsCacheService');
 
 // GET /api/health - API health check
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
+  // Test Firestore connection
+  let firestoreStatus = 'unavailable';
+  let firestoreTest = null;
+  
+  if (firebaseService.isInitialized && firebaseService.firestore) {
+    firestoreStatus = 'connected';
+    try {
+      await firebaseService.firestore
+        .collection('_health')
+        .doc('check')
+        .get()
+        .catch(() => {}); // Ignore if collection doesn't exist
+      firestoreTest = 'ok';
+    } catch (testError) {
+      firestoreTest = `error: ${testError.message}`;
+      firestoreStatus = 'error';
+    }
+  }
+  
   const health = {
     status: 'OK',
     api: {
@@ -23,7 +42,9 @@ router.get('/', (req, res) => {
     services: {
       firebase: {
         initialized: firebaseService.isInitialized || false,
-        status: firebaseService.isInitialized ? 'healthy' : 'unavailable'
+        status: firebaseService.isInitialized ? 'healthy' : 'unavailable',
+        firestore: firestoreStatus,
+        firestoreTest: firestoreTest
       },
       scheduler: {
         initialized: schedulerService.isInitialized || false,

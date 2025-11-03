@@ -28,11 +28,34 @@ router.post('/generate', authenticateUser, async (req, res) => {
       });
     }
 
+    // Check if Firestore is available
+    if (!firebaseService.firestore) {
+      console.error('❌ Firestore is not initialized');
+      return res.status(503).json({
+        success: false,
+        error: 'Service unavailable',
+        message: 'Database service is not available. Please try again later.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
     // Get user data from Firestore to check limits
-    const userDoc = await firebaseService.firestore
-      .collection('users')
-      .doc(userId)
-      .get();
+    let userDoc;
+    try {
+      userDoc = await firebaseService.firestore
+        .collection('users')
+        .doc(userId)
+        .get();
+    } catch (firestoreError) {
+      console.error('❌ Failed to fetch user document:', firestoreError);
+      return res.status(503).json({
+        success: false,
+        error: 'Database error',
+        message: 'Failed to retrieve user information. Please try again.',
+        details: firestoreError.message,
+        timestamp: new Date().toISOString()
+      });
+    }
 
     let userData = userDoc.exists ? userDoc.data() : {};
     
@@ -325,10 +348,27 @@ Keep it specific to ${ticker}. Refer to price/news provided. Use plain English. 
     });
   } catch (error) {
     console.error('❌ Error in POST /api/summary/generate:', error);
-    res.status(500).json({
+    console.error('Error stack:', error.stack);
+    
+    // Provide more detailed error messages based on error type
+    let errorMessage = error.message;
+    let statusCode = 500;
+    
+    if (error.message.includes('OpenAI')) {
+      errorMessage = 'AI service error. Please try again.';
+      statusCode = 503;
+    } else if (error.message.includes('Firestore') || error.message.includes('Firebase')) {
+      errorMessage = 'Database service error. Please try again.';
+      statusCode = 503;
+    } else if (error.message.includes('quota') || error.message.includes('limit')) {
+      errorMessage = 'Service quota exceeded. Please try again later.';
+      statusCode = 429;
+    }
+    
+    res.status(statusCode).json({
       success: false,
       error: 'Internal server error',
-      message: error.message,
+      message: errorMessage,
       timestamp: new Date().toISOString()
     });
   }

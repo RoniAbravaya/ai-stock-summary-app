@@ -73,12 +73,21 @@ class FirebaseService {
         });
       }
 
-      // Initialize Firestore for the named database used by the mobile app
+      // Initialize Firestore - try named database first, then default
       try {
         this._firestore = getFirestore(admin.app(), 'flutter-database');
+        console.log('✅ Connected to named Firestore database: flutter-database');
       } catch (e) {
-        console.warn('⚠️ Falling back to default Firestore database:', e?.message || e);
-        this._firestore = admin.firestore();
+        console.warn('⚠️ Named database not available, using default Firestore:', e?.message || e);
+        try {
+          this._firestore = admin.firestore();
+          console.log('✅ Connected to default Firestore database');
+        } catch (defaultError) {
+          console.error('❌ Failed to connect to Firestore:', defaultError?.message || defaultError);
+          this._firestore = null;
+          this._isInitialized = false;
+          return;
+        }
       }
 
       this._isInitialized = true;

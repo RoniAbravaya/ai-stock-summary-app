@@ -956,9 +956,10 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
   }
 
   Widget _buildSummaryCard(ThemeData theme, Stock stock) {
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: isDark ? Colors.grey.shade900 : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -976,7 +977,9 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
           const SizedBox(height: 8),
           Text(
             'An AI-generated summary for ${stock.symbol} will appear here, highlighting key trends, recent news, and potential risks.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+            ),
           ),
         ],
       ),

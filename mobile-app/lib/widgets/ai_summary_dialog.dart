@@ -86,10 +86,11 @@ class _AISummaryDialogState extends State<AISummaryDialog> {
 
       final idToken = await user.getIdToken();
       
-      // Generate the summary
+      // Generate the summary with authentication token
       final summary = await _stockService.generateAISummary(
         widget.ticker,
         language: 'en', // TODO: Use user's preferred language
+        idToken: idToken,
       );
 
       // Track usage locally

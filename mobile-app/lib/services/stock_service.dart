@@ -241,13 +241,30 @@ class StockService {
   }
 
   /// Generate AI summary for a ticker
-  Future<String> generateAISummary(String ticker, {String language = 'en'}) async {
+  Future<String> generateAISummary(
+    String ticker, {
+    String language = 'en',
+    String? idToken,
+  }) async {
     try {
       final uri = Uri.parse('$_baseUrl/summary/generate');
+      
+      // Build headers with authentication if token is provided
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      
+      if (idToken != null && idToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $idToken';
+        print('📊 StockService: Sending authenticated request for summary generation');
+      } else {
+        print('⚠️ StockService: No authentication token provided for summary generation');
+      }
+      
       final response = await http
           .post(
             uri,
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: json.encode({'stockId': ticker.toUpperCase(), 'language': language}),
           )
           .timeout(const Duration(seconds: 45));

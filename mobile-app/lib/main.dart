@@ -1467,8 +1467,21 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       setState(() {
         _isGeneratingByStock[stockId] = true;
       });
+      
+      // Get Firebase auth token for API authentication
+      final user = FirebaseService().currentUser;
+      if (user == null) {
+        throw Exception('Please sign in to generate AI summaries');
+      }
+      
+      final idToken = await user.getIdToken();
       final lang = LanguageService().currentLanguage;
-      final content = await StockService().generateAISummary(stockId, language: lang);
+      final content = await StockService().generateAISummary(
+        stockId, 
+        language: lang,
+        idToken: idToken,
+      );
+      
       if (!mounted) return;
       // Immediately show local content while waiting for Firestore stream
       setState(() {

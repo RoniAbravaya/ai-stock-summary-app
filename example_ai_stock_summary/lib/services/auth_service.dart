@@ -106,7 +106,7 @@ class AuthService {
       // Sign in to Supabase with the Facebook access token
       final response = await client.auth.signInWithIdToken(
         provider: OAuthProvider.facebook,
-        idToken: accessToken.tokenString,
+        idToken: accessToken.token,
       );
 
       return response;

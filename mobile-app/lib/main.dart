@@ -1314,7 +1314,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               }
             }
           } catch (_) {}
-          return _buildSummaryContainer(localContent, smallInfo: null, refreshedText: 'Refreshed just now');
+          return _buildSummaryContainer(
+            context,
+            localContent,
+            smallInfo: null,
+            refreshedText: 'Refreshed just now',
+          );
         }
 
         // Otherwise, if server content exists, show it. If regenerating, add a small spinner in header.
@@ -1337,6 +1342,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   : null;
               if (content.isNotEmpty) {
                 return _buildSummaryContainer(
+                  context,
                   content,
                   smallInfo: _formatSmallInfo(priceDesc),
                   refreshedText: refreshedText,
@@ -1371,13 +1377,40 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     return const Text('No summary generated yet');
   }
 
-  Widget _buildSummaryContainer(String content, {String? smallInfo, String? refreshedText}) {
+  Widget _buildSummaryContainer(BuildContext context, String content,
+      {String? smallInfo, String? refreshedText}) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final Color backgroundColor =
+        isDark ? scheme.surfaceVariant : Colors.grey.shade100;
+    final Color borderColor = isDark ? Colors.white10 : Colors.grey.shade300;
+    final Color primaryTextColor =
+        isDark ? scheme.onSurface : Colors.black.withOpacity(0.87);
+    final Color secondaryTextColor =
+        isDark ? scheme.onSurface.withOpacity(0.7) : Colors.grey.shade700;
+    final TextStyle headerStyle =
+        (theme.textTheme.titleSmall ?? const TextStyle()).copyWith(
+      fontWeight: FontWeight.bold,
+      color: primaryTextColor,
+    );
+    final TextStyle metaStyle =
+        (theme.textTheme.bodySmall ?? const TextStyle(fontSize: 12)).copyWith(
+      color: secondaryTextColor,
+    );
+    final TextStyle contentStyle =
+        (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
+      color: primaryTextColor,
+      height: 1.35,
+    );
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1385,20 +1418,24 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: const [
-                  Icon(Icons.auto_awesome, size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'AI Summary',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
+              Row(children: [
+                Icon(
+                  Icons.auto_awesome,
+                  size: 16,
+                  color: isDark
+                      ? scheme.primary.withOpacity(0.85)
+                      : scheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'AI Summary',
+                  style: headerStyle,
+                ),
+              ]),
               if (smallInfo != null && smallInfo.isNotEmpty)
                 Text(
                   smallInfo,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  style: metaStyle,
                 ),
             ],
           ),
@@ -1406,13 +1443,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             const SizedBox(height: 4),
             Text(
               refreshedText,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: metaStyle,
             ),
           ],
           const SizedBox(height: 6),
           SelectableText(
             content,
-            style: const TextStyle(height: 1.35),
+            style: contentStyle,
           ),
         ],
       ),

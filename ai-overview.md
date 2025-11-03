@@ -85,11 +85,24 @@ Admin UI → Firestore admin_notifications → Cloud Function → FCM API → Us
 2. **User Type**: Target free or premium users
 3. **Specific Users**: Send to selected users by email
 
-### Cloud Function: `processNotification`
+### Cloud Functions
+
+#### `processNotification`
 - **Trigger**: Firestore document creation in `admin_notifications`
 - **Batch Processing**: Handles up to 1000 tokens per batch (FCM limit)
 - **Error Handling**: Logs failures and updates notification status
 - **Retry Logic**: Built-in Firebase Functions retry on failure
+
+#### `monthlyUsageReset`
+- **Schedule**: Runs at 00:00 UTC on 1st of every month
+- **Purpose**: Reset all users' AI summary usage counters
+- **Process**:
+  1. Fetches all user documents
+  2. Saves current usage to history
+  3. Resets `summariesUsed` to 0
+  4. Updates `lastResetDate`
+  5. Logs event to `system_logs`
+- **Monitoring**: Check `system_logs` collection after 1st
 
 ## Data Models
 
@@ -101,9 +114,18 @@ Admin UI → Firestore admin_notifications → Cloud Function → FCM API → Us
   photoURL: string,
   role: "user" | "admin",
   subscriptionType: "free" | "premium" | "admin",
-  summariesUsed: number,
-  summariesLimit: number,
-  fcmToken: string,           // FCM registration token
+  summariesUsed: number,         // Current month usage
+  summariesLimit: number,        // 5 for free, 100 for premium, 1000 for admin
+  lastUsedAt: timestamp,         // Last AI summary generation time
+  lastResetDate: timestamp,      // Last reset on 1st of month
+  usageHistory: {                // Last 12 months of usage
+    "2025-10": {
+      used: number,
+      limit: number,
+      resetDate: timestamp
+    }
+  },
+  fcmToken: string,              // FCM registration token
   fcmTokenUpdatedAt: timestamp,
   createdAt: timestamp,
   updatedAt: timestamp
@@ -128,6 +150,30 @@ Admin UI → Firestore admin_notifications → Cloud Function → FCM API → Us
 }
 ```
 
+### Usage Log (`usage_logs/{id}`)
+```javascript
+{
+  userId: string,
+  userEmail: string,
+  action: "ai_summary_generated",
+  ticker: string,
+  language: string,
+  subscriptionType: string,
+  timestamp: timestamp
+}
+```
+
+### System Log (`system_logs/{id}`)
+```javascript
+{
+  event: "monthly_usage_reset",
+  monthKey: string,            // e.g., "2025-10"
+  usersReset: number,
+  usersSkipped: number,
+  timestamp: timestamp
+}
+```
+
 ## Security Rules
 
 ### Firestore Rules
@@ -135,6 +181,10 @@ Admin UI → Firestore admin_notifications → Cloud Function → FCM API → Us
 - Admins can create notifications
 - Cloud Functions can process notifications (no auth required)
 - FCM tokens are user-private
+- **Usage Tracking**:
+  - Users can create usage logs (when generating summaries)
+  - Admins can read all usage logs
+  - System logs are admin-only
 
 ### Firebase Storage Rules
 - Users can manage their profile images
@@ -158,6 +208,50 @@ Admin UI → Firestore admin_notifications → Cloud Function → FCM API → Us
 - User registration trends
 - Subscription statistics
 - System health monitoring
+- **AI Summary Usage Statistics**:
+  - Total users by subscription type
+  - Usage breakdown by user type
+  - Users at/near limit tracking
+  - Average usage per user
+  - Top users by usage
+  - Monthly generation counts
+  - Individual user usage details
+
+## AI Summary Usage & Limits
+
+### Usage Limits
+- **Free Users**: 5 AI summaries per month
+- **Premium Users**: 100 AI summaries per month
+- **Admin Users**: Unlimited summaries
+
+### Monthly Reset
+- Automatic reset on **1st of every month at 00:00 UTC**
+- Cloud Function: `monthlyUsageReset`
+- Previous month's usage saved to history (last 12 months)
+- Client-side reset detection on app launch
+
+### Usage Tracking
+1. **Generation Request**:
+   - Requires Firebase authentication
+   - Checks current usage vs limit
+   - Shows warning if near limit (free users)
+   - Blocks if limit exceeded
+
+2. **Counter Increment**:
+   - After successful generation
+   - Updates `summariesUsed` in user document
+   - Logs to `usage_logs` collection for statistics
+
+3. **History Management**:
+   - Saves monthly usage to `usageHistory`
+   - Keeps last 12 months
+   - Displayed in user settings
+
+### User Experience
+- **Warning Dialog**: Shows when free user has 1 summary left
+- **Limit Dialog**: Shows when limit exceeded with upgrade prompt
+- **Usage Stats Card**: Visual progress bar and history in settings
+- **Real-time Feedback**: Remaining summaries shown after each generation
 
 ## Environment Configuration
 

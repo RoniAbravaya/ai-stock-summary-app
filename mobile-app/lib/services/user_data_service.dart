@@ -164,17 +164,12 @@ class UserDataService {
     return limit - used;
   }
 
-  /// Get days until next reset
+  /// Get days until next reset (1st of next month)
   Future<int> getDaysUntilReset() async {
-    final usageData = await getUsageData();
-    final registrationDate = DateTime.parse(usageData['registrationDate']);
     final now = DateTime.now();
-
-    // Calculate next reset date (30 days from registration, then every 30 days)
-    DateTime nextReset = registrationDate.add(const Duration(days: 30));
-    while (nextReset.isBefore(now)) {
-      nextReset = nextReset.add(const Duration(days: 30));
-    }
+    
+    // Next reset is on the 1st of next month
+    final nextReset = DateTime(now.year, now.month + 1, 1);
 
     return nextReset.difference(now).inDays;
   }
@@ -438,7 +433,8 @@ class UserDataService {
   }
 
   Map<String, dynamic> _ensureDefaultUsageData(Map<String, dynamic> usageData) {
-    final defaultLimit = usageData['role'] == 'admin' ? 1000 : 10;
+    final defaultLimit = usageData['role'] == 'admin' ? 1000 : 
+                        (usageData['subscriptionType'] == 'free' ? 5 : 10);
 
     return {
       'summariesUsed': usageData['summariesUsed'] ?? 0,
@@ -447,7 +443,7 @@ class UserDataService {
           usageData['lastResetDate'] ?? DateTime.now().toIso8601String(),
       'registrationDate':
           usageData['registrationDate'] ?? DateTime.now().toIso8601String(),
-      'monthlyUsageHistory': usageData['monthlyUsageHistory'] ?? [],
+      'usageHistory': usageData['usageHistory'] ?? {},
       ...usageData,
     };
   }
@@ -455,39 +451,52 @@ class UserDataService {
   Future<void> _checkAndHandleMonthlyReset(
     Map<String, dynamic> usageData,
   ) async {
-    final registrationDate = DateTime.parse(
-      usageData['registrationDate'] ?? DateTime.now().toIso8601String(),
-    );
-    final lastResetDate = DateTime.parse(
-      usageData['lastResetDate'] ?? DateTime.now().toIso8601String(),
-    );
     final now = DateTime.now();
+    final lastResetDate = usageData['lastResetDate'] != null
+        ? DateTime.parse(usageData['lastResetDate'])
+        : DateTime(now.year, now.month - 1, 1); // Default to last month
 
-    // Calculate if 30 days have passed since last reset
-    final daysSinceReset = now.difference(lastResetDate).inDays;
+    // Check if we're in a new month (reset on 1st of every month)
+    final isNewMonth = now.month != lastResetDate.month || 
+                       now.year != lastResetDate.year;
 
-    if (daysSinceReset >= 30) {
+    if (isNewMonth && now.day >= 1) {
       // Reset usage
       final previousUsage = usageData['summariesUsed'] ?? 0;
-      usageData['summariesUsed'] = 0;
-      usageData['lastResetDate'] = now.toIso8601String();
+      
+      // Only reset if we have usage or it's been a while
+      if (previousUsage > 0 || now.difference(lastResetDate).inDays > 32) {
+        usageData['summariesUsed'] = 0;
+        usageData['lastResetDate'] = now.toIso8601String();
 
-      // Add to history
-      List<dynamic> history = usageData['monthlyUsageHistory'] ?? [];
-      history.add({
-        'month': '${now.year}-${now.month.toString().padLeft(2, '0')}',
-        'usage': previousUsage,
-        'resetDate': now.toIso8601String(),
-      });
+        // Add to history with last month's key
+        final monthKey = '${lastResetDate.year}-${lastResetDate.month.toString().padLeft(2, '0')}';
+        Map<String, dynamic> history = Map<String, dynamic>.from(
+          usageData['usageHistory'] ?? {}
+        );
+        
+        if (previousUsage > 0) {
+          history[monthKey] = {
+            'used': previousUsage,
+            'limit': usageData['summariesLimit'] ?? 5,
+            'resetDate': now.toIso8601String(),
+          };
+        }
 
-      // Keep only last 12 months
-      if (history.length > 12) {
-        history = history.sublist(history.length - 12);
+        // Keep only last 12 months
+        if (history.length > 12) {
+          final sortedKeys = history.keys.toList()..sort();
+          final keysToRemove = sortedKeys.take(history.length - 12).toList();
+          for (final key in keysToRemove) {
+            history.remove(key);
+          }
+        }
+        
+        usageData['usageHistory'] = history;
+
+        await _saveUsageData(usageData);
+        print('🔄 Monthly usage reset completed (1st of month)');
       }
-      usageData['monthlyUsageHistory'] = history;
-
-      await _saveUsageData(usageData);
-      print('🔄 Monthly usage reset completed');
     }
   }
 

@@ -11,17 +11,107 @@ const newsCacheService = require('../services/newsCacheService');
 const schedulerService = require('../services/schedulerService');
 const OpenAI = require('openai');
 const firebaseService = require('../services/firebaseService');
+const { authenticateUser } = require('../middleware/auth');
 
-// POST /api/summary/generate - Generate new summary
-router.post('/generate', async (req, res) => {
+// POST /api/summary/generate - Generate new summary (requires authentication)
+router.post('/generate', authenticateUser, async (req, res) => {
   try {
     const { stockId, language = 'en' } = req.body;
-    console.log(`🤖 POST /api/summary/generate - Generating summary for ${stockId} in ${language}`);
+    const userId = req.user.uid;
+    console.log(`🤖 POST /api/summary/generate - User ${req.user.email} generating summary for ${stockId} in ${language}`);
     
     if (!stockId) {
       return res.status(400).json({
         success: false,
         error: 'stockId is required',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Get user data from Firestore to check limits
+    const userDoc = await firebaseService.firestore
+      .collection('users')
+      .doc(userId)
+      .get();
+
+    let userData = userDoc.exists ? userDoc.data() : {};
+    
+    // Initialize user data if not exists
+    if (!userDoc.exists) {
+      userData = {
+        email: req.user.email,
+        displayName: req.user.name || req.user.email,
+        role: 'user',
+        subscriptionType: 'free',
+        summariesUsed: 0,
+        summariesLimit: 5, // Free users get 5 per month
+        createdAt: firebaseService.admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebaseService.admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      await firebaseService.firestore
+        .collection('users')
+        .doc(userId)
+        .set(userData);
+      
+      console.log(`✅ Created new user profile for ${req.user.email}`);
+    }
+
+    // Check monthly reset (1st of the month)
+    const now = new Date();
+    const lastResetDate = userData.lastResetDate ? userData.lastResetDate.toDate() : new Date(0);
+    const isNewMonth = now.getMonth() !== lastResetDate.getMonth() || now.getFullYear() !== lastResetDate.getFullYear();
+
+    if (isNewMonth) {
+      console.log(`🔄 Monthly reset triggered for user ${req.user.email}`);
+      
+      // Save previous month's usage to history
+      const monthKey = `${lastResetDate.getFullYear()}-${String(lastResetDate.getMonth() + 1).padStart(2, '0')}`;
+      const usageHistory = userData.usageHistory || {};
+      
+      if (userData.summariesUsed > 0) {
+        usageHistory[monthKey] = {
+          used: userData.summariesUsed,
+          limit: userData.summariesLimit,
+          resetDate: firebaseService.admin.firestore.FieldValue.serverTimestamp()
+        };
+      }
+
+      // Reset counter
+      userData.summariesUsed = 0;
+      userData.lastResetDate = firebaseService.admin.firestore.FieldValue.serverTimestamp();
+      userData.usageHistory = usageHistory;
+      
+      await firebaseService.firestore
+        .collection('users')
+        .doc(userId)
+        .update({
+          summariesUsed: 0,
+          lastResetDate: firebaseService.admin.firestore.FieldValue.serverTimestamp(),
+          usageHistory: usageHistory
+        });
+    }
+
+    // Check usage limits
+    const summariesUsed = userData.summariesUsed || 0;
+    const summariesLimit = userData.summariesLimit || 5;
+    const userRole = userData.role || 'user';
+    const subscriptionType = userData.subscriptionType || 'free';
+
+    // Admin users have unlimited access
+    if (userRole !== 'admin' && summariesUsed >= summariesLimit) {
+      console.log(`⚠️ User ${req.user.email} exceeded limit: ${summariesUsed}/${summariesLimit}`);
+      return res.status(429).json({
+        success: false,
+        error: 'Usage limit exceeded',
+        message: `You have used ${summariesUsed} of ${summariesLimit} AI summaries this month. ${subscriptionType === 'free' ? 'Upgrade to premium for more summaries!' : 'Your limit will reset on the 1st of next month.'}`,
+        usageInfo: {
+          used: summariesUsed,
+          limit: summariesLimit,
+          remaining: 0,
+          subscriptionType: subscriptionType,
+          resetDate: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+        },
         timestamp: new Date().toISOString()
       });
     }
@@ -174,6 +264,8 @@ Keep it specific to ${ticker}. Refer to price/news provided. Use plain English. 
               ticker,
               model,
               inputs: { priceDesc, newsCount: newsDesc.length },
+              generatedBy: userId,
+              generatedAt: firebaseService.admin.firestore.FieldValue.serverTimestamp(),
               updatedAt: firebaseService.admin.firestore.FieldValue.serverTimestamp(),
             },
             { merge: true }
@@ -181,6 +273,36 @@ Keep it specific to ${ticker}. Refer to price/news provided. Use plain English. 
       }
     } catch (persistError) {
       console.warn('⚠️ Failed to persist summary to Firestore:', persistError?.message || persistError);
+    }
+
+    // Increment usage counter
+    try {
+      await firebaseService.firestore
+        .collection('users')
+        .doc(userId)
+        .update({
+          summariesUsed: (summariesUsed + 1),
+          lastUsedAt: firebaseService.admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebaseService.admin.firestore.FieldValue.serverTimestamp()
+        });
+      
+      console.log(`✅ Incremented usage for ${req.user.email}: ${summariesUsed + 1}/${summariesLimit}`);
+      
+      // Track generation in usage_logs collection for admin statistics
+      await firebaseService.firestore
+        .collection('usage_logs')
+        .add({
+          userId: userId,
+          userEmail: req.user.email,
+          action: 'ai_summary_generated',
+          ticker: ticker,
+          language: language,
+          subscriptionType: subscriptionType,
+          timestamp: firebaseService.admin.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (usageError) {
+      console.error('❌ Failed to update usage counter:', usageError?.message || usageError);
+      // Don't fail the request if usage tracking fails
     }
 
     return res.json({
@@ -193,6 +315,12 @@ Keep it specific to ${ticker}. Refer to price/news provided. Use plain English. 
       },
       stockId: ticker,
       source: 'openai',
+      usageInfo: {
+        used: summariesUsed + 1,
+        limit: summariesLimit,
+        remaining: summariesLimit - (summariesUsed + 1),
+        subscriptionType: subscriptionType
+      },
       timestamp: new Date().toISOString()
     });
   } catch (error) {

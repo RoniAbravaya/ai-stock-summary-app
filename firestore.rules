@@ -64,6 +64,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
+    // Usage logs - track AI summary generation for statistics
+    match /usage_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();  // Allow users to create logs when generating summaries
+      allow update, delete: if isAdmin();
+    }
+    
+    // System logs - admin only for system events
+    match /system_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+    
     // Admin-only collections
     match /admin/{document=**} {
       allow read, write: if isAdmin();

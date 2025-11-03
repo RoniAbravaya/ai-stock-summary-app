@@ -1,9 +1,11 @@
 /**
  * Firebase Cloud Functions for AI Stock Summary App
  * Updated: 2025-06-01 - Fixed compatibility for all notification types
+ * Updated: 2025-11-03 - Added monthly usage reset scheduled function
  */
 
 const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {logger} = require("firebase-functions");
 const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
@@ -489,4 +491,91 @@ async function cleanupInvalidTokens(invalidTokens) {
   } catch (error) {
     logger.error("❌ Error cleaning invalid tokens:", error);
   }
-} 
+}
+
+/**
+ * Monthly reset of AI summary usage counters
+ * Runs on the 1st of every month at 00:00 UTC
+ */
+exports.monthlyUsageReset = onSchedule({
+  schedule: "0 0 1 * *", // At 00:00 on the 1st of every month
+  timeZone: "UTC",
+  region: "us-central1"
+}, async (context) => {
+  try {
+    logger.info("🔄 Starting monthly usage reset...");
+    
+    const db = getFirestore(admin.app(), "flutter-database");
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const monthKey = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
+    
+    logger.info(`📅 Resetting usage for month: ${monthKey}`);
+
+    // Get all users
+    const usersSnapshot = await db.collection("users").get();
+    
+    if (usersSnapshot.empty) {
+      logger.info("ℹ️ No users found to reset");
+      return;
+    }
+
+    const batch = db.batch();
+    let resetCount = 0;
+    let skippedCount = 0;
+
+    usersSnapshot.forEach((doc) => {
+      const userData = doc.data();
+      const summariesUsed = userData.summariesUsed || 0;
+      const summariesLimit = userData.summariesLimit || 5;
+      const userRole = userData.role || 'user';
+      
+      // Skip if user hasn't used any summaries
+      if (summariesUsed === 0) {
+        skippedCount++;
+        return;
+      }
+
+      // Prepare usage history entry
+      const usageHistory = userData.usageHistory || {};
+      usageHistory[monthKey] = {
+        used: summariesUsed,
+        limit: summariesLimit,
+        resetDate: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      // Reset the counter
+      batch.update(doc.ref, {
+        summariesUsed: 0,
+        lastResetDate: admin.firestore.FieldValue.serverTimestamp(),
+        usageHistory: usageHistory,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      resetCount++;
+      
+      logger.info(`✅ Reset user ${userData.email}: ${summariesUsed}/${summariesLimit} → 0/${summariesLimit}`);
+    });
+
+    // Commit all updates
+    if (resetCount > 0) {
+      await batch.commit();
+      logger.info(`✅ Monthly usage reset complete: ${resetCount} users reset, ${skippedCount} skipped (no usage)`);
+    } else {
+      logger.info("ℹ️ No users needed reset");
+    }
+
+    // Log the reset event
+    await db.collection("system_logs").add({
+      event: "monthly_usage_reset",
+      monthKey: monthKey,
+      usersReset: resetCount,
+      usersSkipped: skippedCount,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+  } catch (error) {
+    logger.error("❌ Error in monthly usage reset:", error);
+    throw error; // Rethrow to mark function as failed
+  }
+}); 

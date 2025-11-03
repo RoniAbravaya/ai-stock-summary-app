@@ -51,7 +51,7 @@ dependencies:
   # Authentication
   google_sign_in: ^6.2.1
   flutter_facebook_auth: ^6.0.4
-  twitter_login: ^4.4.2
+  # twitter_login: ^4.4.2  # Temporarily disabled - namespace issues with Android build
   
   # HTTP & API Communication
   http: ^1.1.0

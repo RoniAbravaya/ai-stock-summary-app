@@ -5,7 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import 'package:twitter_login/twitter_login.dart';
+// import 'package:twitter_login/twitter_login.dart';  // Temporarily disabled
 // import 'user_data_service.dart'; // Removed
 
 /// Firebase Service for Flutter
@@ -870,7 +870,12 @@ class FirebaseService {
   }
 
   /// Sign in with Twitter
+  /// Note: Temporarily disabled due to package compatibility issues
+  /// Will be re-enabled once twitter_login package is updated
   Future<UserCredential> signInWithTwitter() async {
+    throw Exception('Twitter sign-in is temporarily unavailable. Please use Google or Facebook sign-in.');
+    
+    /* Temporarily commented out - twitter_login package has Android namespace issues
     try {
       print('🔄 Starting Twitter Sign-In...');
 
@@ -978,6 +983,7 @@ class FirebaseService {
 
       rethrow;
     }
+    */
   }
 
   /// Setup admin user after authentication

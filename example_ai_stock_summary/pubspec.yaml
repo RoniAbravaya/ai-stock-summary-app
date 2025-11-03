@@ -29,7 +29,7 @@ dependencies:
   supabase_flutter: ^2.10.0
   google_sign_in: ^7.1.1
   flutter_facebook_auth: ^6.0.4
-  twitter_login: ^4.4.2
+  # twitter_login: ^4.4.2  # Temporarily disabled - namespace issues with Android build
   google_mobile_ads: ^6.0.0
   in_app_purchase: ^3.2.3
   firebase_analytics: ^12.0.0

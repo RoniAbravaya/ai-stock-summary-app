@@ -632,43 +632,44 @@ class _LoginState extends State<Login> {
                   ),
                 ),
 
-                SizedBox(height: 2.h),
+                // Twitter temporarily disabled due to package compatibility
+                // SizedBox(height: 2.h),
 
-                // Twitter Sign-In Button
-                SizedBox(
-                  height: 7.h,
-                  child: OutlinedButton(
-                    onPressed: _isLoading ? null : _handleTwitterSignIn,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(
-                        color: Color(0xFF1DA1F2),
-                        width: 1.5,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CustomIconWidget(
-                          iconName: 'telegram',
-                          color: Color(0xFF1DA1F2),
-                          size: 6.w,
-                        ),
-                        SizedBox(width: 3.w),
-                        Text(
-                          'Continue with Twitter',
-                          style: AppTheme.lightTheme.textTheme.titleMedium
-                              ?.copyWith(
-                            color: Color(0xFF1DA1F2),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                // // Twitter Sign-In Button
+                // SizedBox(
+                //   height: 7.h,
+                //   child: OutlinedButton(
+                //     onPressed: _isLoading ? null : _handleTwitterSignIn,
+                //     style: OutlinedButton.styleFrom(
+                //       side: BorderSide(
+                //         color: Color(0xFF1DA1F2),
+                //         width: 1.5,
+                //       ),
+                //       shape: RoundedRectangleBorder(
+                //         borderRadius: BorderRadius.circular(12),
+                //       ),
+                //     ),
+                //     child: Row(
+                //       mainAxisAlignment: MainAxisAlignment.center,
+                //       children: [
+                //         CustomIconWidget(
+                //           iconName: 'telegram',
+                //           color: Color(0xFF1DA1F2),
+                //           size: 6.w,
+                //         ),
+                //         SizedBox(width: 3.w),
+                //         Text(
+                //           'Continue with Twitter',
+                //           style: AppTheme.lightTheme.textTheme.titleMedium
+                //               ?.copyWith(
+                //             color: Color(0xFF1DA1F2),
+                //             fontWeight: FontWeight.w500,
+                //           ),
+                //         ),
+                //       ],
+                //     ),
+                //   ),
+                // ),
 
                 SizedBox(height: 6.h),
 

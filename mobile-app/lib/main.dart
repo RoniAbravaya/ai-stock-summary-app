@@ -601,16 +601,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         side: const BorderSide(color: Color(0xFF1877F2)),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _signInWithTwitter,
-                      icon: const Icon(Icons.telegram),
-                      label: const Text('Continue with Twitter'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF1DA1F2),
-                        side: const BorderSide(color: Color(0xFF1DA1F2)),
-                      ),
-                    ),
+                    // Twitter temporarily disabled due to package compatibility
+                    // const SizedBox(height: 12),
+                    // OutlinedButton.icon(
+                    //   onPressed: _isLoading ? null : _signInWithTwitter,
+                    //   icon: const Icon(Icons.telegram),
+                    //   label: const Text('Continue with Twitter'),
+                    //   style: OutlinedButton.styleFrom(
+                    //     foregroundColor: const Color(0xFF1DA1F2),
+                    //     side: const BorderSide(color: Color(0xFF1DA1F2)),
+                    //   ),
+                    // ),
                   ],
                 ],
               ],

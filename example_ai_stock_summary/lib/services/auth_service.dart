@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import 'package:twitter_login/twitter_login.dart';
+// import 'package:twitter_login/twitter_login.dart';  // Temporarily disabled
 import '../services/supabase_service.dart';
 import '../models/user_profile_model.dart';
 
@@ -117,7 +117,11 @@ class AuthService {
   }
 
   // Sign in with Twitter OAuth
+  /// Note: Temporarily disabled due to package compatibility issues
   Future<AuthResponse> signInWithTwitter() async {
+    throw Exception('Twitter sign-in is temporarily unavailable. Please use Google or Facebook sign-in.');
+    
+    /* Temporarily commented out
     try {
       // Initialize Twitter login
       final twitterLogin = TwitterLogin(
@@ -158,6 +162,7 @@ class AuthService {
     } catch (error) {
       throw Exception('Twitter sign-in failed: $error');
     }
+    */
   }
 
   // Sign out

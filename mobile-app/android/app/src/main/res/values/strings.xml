@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AI Stock Summary</string>
+    <string name="app_name">MarketMind AI</string>
     <string name="facebook_app_id">609450172160549</string>
     <string name="fb_login_protocol_scheme">fb609450172160549</string>
     <string name="facebook_client_token">9877636b2ff5a2e40b1dc4d0783712b3</string>

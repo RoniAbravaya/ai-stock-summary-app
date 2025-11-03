@@ -4,8 +4,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 // import 'user_data_service.dart'; // Removed
-// import 'package:flutter_facebook_auth/flutter_facebook_auth.dart'; // Removed
 
 /// Firebase Service for Flutter
 /// Handles authentication, Firestore operations, and other Firebase services
@@ -765,6 +765,109 @@ class FirebaseService {
     }
   }
 
+  /// Sign in with Facebook
+  Future<UserCredential> signInWithFacebook() async {
+    try {
+      print('🔄 Starting Facebook Sign-In...');
+
+      // Trigger the Facebook sign-in flow
+      final LoginResult result = await FacebookAuth.instance.login(
+        permissions: ['email', 'public_profile'],
+      );
+
+      // Check if login was successful
+      if (result.status != LoginStatus.success) {
+        if (result.status == LoginStatus.cancelled) {
+          throw Exception('Facebook Sign-In was cancelled');
+        }
+        throw Exception('Facebook Sign-In failed: ${result.message}');
+      }
+
+      // Get the access token
+      final AccessToken? accessToken = result.accessToken;
+      if (accessToken == null) {
+        throw Exception('Failed to get Facebook access token');
+      }
+
+      // Create a credential from the access token
+      final OAuthCredential credential = FacebookAuthProvider.credential(
+        accessToken.tokenString,
+      );
+
+      // Sign in to Firebase with the Facebook credential
+      final userCredential = await auth.signInWithCredential(credential);
+      print('✅ Facebook Sign-In successful for: ${userCredential.user?.email}');
+
+      // Check Firestore connection and update/create user document
+      await _checkFirestoreConnection();
+
+      if (_isFirestoreAvailable && userCredential.user != null) {
+        try {
+          await _updateUserDocumentSafely(userCredential.user!);
+          
+          // Store any pending FCM token first
+          await _storePendingFCMToken();
+          
+          // Ensure FCM token exists and refresh if missing
+          final hasToken = await ensureFCMTokenExists();
+          if (!hasToken) {
+            print('⚠️ FCM token refresh failed during Facebook sign-in');
+          }
+        } catch (firestoreError) {
+          print('⚠️ Firestore operations failed: $firestoreError');
+        }
+      }
+
+      // Setup admin user after successful authentication
+      await _setupAdminUserAfterAuth();
+
+      return userCredential;
+    } catch (e) {
+      print('❌ Error signing in with Facebook: $e');
+
+      // Check if this is a known type casting error similar to Google Sign-In
+      if (e.toString().contains('List<Object?>') &&
+          e.toString().contains('PigeonUserDetails')) {
+        print(
+          '⚠️ Type casting issue detected - this is a known Firebase plugin bug',
+        );
+
+        // The authentication was actually successful, just the return type casting failed
+        if (_auth?.currentUser != null) {
+          print('✅ Authentication still successful despite type casting error');
+
+          // Ensure user document is properly created/updated
+          if (_isFirestoreAvailable) {
+            try {
+              await _updateUserDocumentSafely(_auth!.currentUser!);
+              
+              // Store any pending FCM token
+              await _storePendingFCMToken();
+              
+              // Ensure FCM token exists
+              final hasToken = await ensureFCMTokenExists();
+              if (!hasToken) {
+                print('⚠️ FCM token refresh failed after type cast error recovery');
+              }
+            } catch (docError) {
+              print(
+                '⚠️ User document update failed after type cast error: $docError',
+              );
+            }
+          }
+
+          // Setup admin user after successful authentication
+          await _setupAdminUserAfterAuth();
+
+          // Return success even though there was a type casting error
+          return Future.value(auth.currentUser as UserCredential);
+        }
+      }
+
+      rethrow;
+    }
+  }
+
   /// Setup admin user after authentication
   Future<void> _setupAdminUserAfterAuth() async {
     try {
@@ -943,6 +1046,7 @@ class FirebaseService {
   Future<void> signOut() async {
     try {
       await _googleSignIn.signOut();
+      await FacebookAuth.instance.logOut();
       await auth.signOut();
       print('✅ User signed out successfully');
     } catch (e) {

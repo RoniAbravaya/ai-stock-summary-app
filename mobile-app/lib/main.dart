@@ -591,6 +591,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         _languageService.translate('auth_sign_in_google'),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _signInWithFacebook,
+                      icon: const Icon(Icons.facebook),
+                      label: const Text('Continue with Facebook'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1877F2),
+                        side: const BorderSide(color: Color(0xFF1877F2)),
+                      ),
+                    ),
                   ],
                 ],
               ],
@@ -721,6 +731,26 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       if (widget.firebaseEnabled) {
         await FirebaseService().signInWithGoogle();
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar(e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _signInWithFacebook() async {
+    if (!mounted) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      if (widget.firebaseEnabled) {
+        await FirebaseService().signInWithFacebook();
       }
     } catch (e) {
       if (mounted) {

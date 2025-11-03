@@ -50,7 +50,7 @@ dependencies:
   
   # Authentication
   google_sign_in: ^6.2.1
-  # flutter_facebook_auth: ^6.0.4  # Removed - causing SDK initialization issues
+  flutter_facebook_auth: ^6.0.4
   
   # HTTP & API Communication
   http: ^1.1.0

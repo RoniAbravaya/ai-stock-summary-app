@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const firebaseService = require('../services/firebaseService');
 const stockCacheService = require('../services/stockCacheService');
+const { authenticateUser } = require('../middleware/auth');
 
 /**
  * Middleware to validate user ID
@@ -242,6 +243,95 @@ router.delete('/:uid/favorites/:ticker', validateUserId, async (req, res) => {
       message: error.message,
       uid: req.params.uid,
       ticker: req.params.ticker,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * GET /api/users/:uid/usage - Get user's AI summary usage data
+ */
+router.get('/:uid/usage', authenticateUser, async (req, res) => {
+  try {
+    const uid = req.params.uid;
+    
+    // Users can only access their own usage data
+    if (req.user.uid !== uid) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'You can only access your own usage data',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    console.log(`👤 GET /api/users/${uid}/usage - Getting user usage data`);
+
+    if (!firebaseService.firestore) {
+      return res.status(503).json({
+        success: false,
+        error: 'Firebase Firestore not available',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Get user document
+    const userDoc = await firebaseService.firestore
+      .collection('users')
+      .doc(uid)
+      .get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const userData = userDoc.data();
+    
+    // Calculate next reset date (1st of next month)
+    const now = new Date();
+    const nextReset = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const usageData = {
+      currentMonth: {
+        used: userData.summariesUsed || 0,
+        limit: userData.summariesLimit || 5,
+        remaining: (userData.summariesLimit || 5) - (userData.summariesUsed || 0),
+        percentage: ((userData.summariesUsed || 0) / (userData.summariesLimit || 5)) * 100,
+        lastUsedAt: userData.lastUsedAt?.toDate()?.toISOString() || null,
+        lastResetDate: userData.lastResetDate?.toDate()?.toISOString() || null,
+        nextResetDate: nextReset.toISOString()
+      },
+      subscription: {
+        type: userData.subscriptionType || 'free',
+        role: userData.role || 'user'
+      },
+      history: userData.usageHistory || {},
+      account: {
+        email: userData.email,
+        displayName: userData.displayName,
+        createdAt: userData.createdAt?.toDate()?.toISOString() || null
+      }
+    };
+
+    console.log(`✅ Successfully returned usage data for user ${uid}`);
+    res.json({
+      success: true,
+      data: usageData,
+      uid: uid,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error(`❌ Error getting usage data for user ${req.params.uid}:`, error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message,
+      uid: req.params.uid,
       timestamp: new Date().toISOString()
     });
   }

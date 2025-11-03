@@ -9,6 +9,8 @@ const newsCacheService = require('../services/newsCacheService');
 const stockCacheService = require('../services/stockCacheService');
 const yahooFinanceService = require('../services/yahooFinanceService');
 const schedulerService = require('../services/schedulerService');
+const firebaseService = require('../services/firebaseService');
+const { authenticateUser, requireAdmin } = require('../middleware/auth');
 
 // GET /api/admin/cache-stats - Get cache statistics
 router.get('/cache-stats', async (req, res) => {
@@ -248,6 +250,217 @@ router.get('/test-yahoo-api', async (req, res) => {
     }
   } catch (error) {
     console.error('❌ Error testing Yahoo Finance API:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// GET /api/admin/usage-statistics - Get AI summary usage statistics
+router.get('/usage-statistics', authenticateUser, requireAdmin, async (req, res) => {
+  try {
+    console.log('🔧 GET /api/admin/usage-statistics - Getting usage statistics');
+    
+    if (!firebaseService.firestore) {
+      return res.status(503).json({
+        success: false,
+        error: 'Firebase Firestore not available',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Get all users
+    const usersSnapshot = await firebaseService.firestore
+      .collection('users')
+      .get();
+
+    const stats = {
+      totalUsers: 0,
+      usersByType: {
+        free: 0,
+        premium: 0,
+        admin: 0
+      },
+      summaryUsage: {
+        totalGenerated: 0,
+        thisMonth: 0,
+        byType: {
+          free: 0,
+          premium: 0,
+          admin: 0
+        }
+      },
+      usageLimits: {
+        usersAtLimit: 0,
+        usersNearLimit: 0,
+        averageUsage: 0
+      },
+      topUsers: []
+    };
+
+    const userUsageList = [];
+    let totalUsage = 0;
+
+    usersSnapshot.forEach((doc) => {
+      const userData = doc.data();
+      stats.totalUsers++;
+
+      const subscriptionType = userData.subscriptionType || 'free';
+      const summariesUsed = userData.summariesUsed || 0;
+      const summariesLimit = userData.summariesLimit || 5;
+
+      // Count by subscription type
+      stats.usersByType[subscriptionType] = (stats.usersByType[subscriptionType] || 0) + 1;
+
+      // Track usage
+      totalUsage += summariesUsed;
+      stats.summaryUsage.byType[subscriptionType] = (stats.summaryUsage.byType[subscriptionType] || 0) + summariesUsed;
+
+      // Check limits
+      if (summariesUsed >= summariesLimit) {
+        stats.usageLimits.usersAtLimit++;
+      } else if (summariesUsed >= summariesLimit * 0.8) {
+        stats.usageLimits.usersNearLimit++;
+      }
+
+      // Track for top users
+      userUsageList.push({
+        email: userData.email,
+        displayName: userData.displayName,
+        used: summariesUsed,
+        limit: summariesLimit,
+        subscriptionType: subscriptionType
+      });
+    });
+
+    // Calculate average usage
+    stats.usageLimits.averageUsage = stats.totalUsers > 0 ? 
+      Number((totalUsage / stats.totalUsers).toFixed(2)) : 0;
+
+    // Get top 10 users by usage
+    stats.topUsers = userUsageList
+      .sort((a, b) => b.used - a.used)
+      .slice(0, 10);
+
+    // Get total generated from usage logs
+    const usageLogsSnapshot = await firebaseService.firestore
+      .collection('usage_logs')
+      .where('action', '==', 'ai_summary_generated')
+      .get();
+
+    stats.summaryUsage.totalGenerated = usageLogsSnapshot.size;
+
+    // Get this month's usage
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const thisMonthSnapshot = await firebaseService.firestore
+      .collection('usage_logs')
+      .where('action', '==', 'ai_summary_generated')
+      .where('timestamp', '>=', firstDayOfMonth)
+      .get();
+
+    stats.summaryUsage.thisMonth = thisMonthSnapshot.size;
+
+    console.log(`✅ Usage statistics retrieved: ${stats.totalUsers} users, ${stats.summaryUsage.totalGenerated} total summaries`);
+    
+    res.json({
+      success: true,
+      data: stats,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting usage statistics:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// GET /api/admin/user-usage/:userId - Get specific user's usage details
+router.get('/user-usage/:userId', authenticateUser, requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    console.log(`🔧 GET /api/admin/user-usage/${userId} - Getting user usage details`);
+    
+    if (!firebaseService.firestore) {
+      return res.status(503).json({
+        success: false,
+        error: 'Firebase Firestore not available',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Get user document
+    const userDoc = await firebaseService.firestore
+      .collection('users')
+      .doc(userId)
+      .get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const userData = userDoc.data();
+
+    // Get user's usage logs
+    const usageLogsSnapshot = await firebaseService.firestore
+      .collection('usage_logs')
+      .where('userId', '==', userId)
+      .where('action', '==', 'ai_summary_generated')
+      .orderBy('timestamp', 'desc')
+      .limit(50)
+      .get();
+
+    const recentUsage = [];
+    usageLogsSnapshot.forEach((doc) => {
+      const logData = doc.data();
+      recentUsage.push({
+        ticker: logData.ticker,
+        language: logData.language,
+        timestamp: logData.timestamp?.toDate()?.toISOString() || null
+      });
+    });
+
+    const usageDetails = {
+      user: {
+        email: userData.email,
+        displayName: userData.displayName,
+        subscriptionType: userData.subscriptionType || 'free',
+        role: userData.role || 'user'
+      },
+      currentMonth: {
+        used: userData.summariesUsed || 0,
+        limit: userData.summariesLimit || 5,
+        remaining: (userData.summariesLimit || 5) - (userData.summariesUsed || 0),
+        lastUsedAt: userData.lastUsedAt?.toDate()?.toISOString() || null,
+        lastResetDate: userData.lastResetDate?.toDate()?.toISOString() || null
+      },
+      history: userData.usageHistory || {},
+      recentUsage: recentUsage
+    };
+
+    console.log(`✅ User usage details retrieved for ${userData.email}`);
+    
+    res.json({
+      success: true,
+      data: usageDetails,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting user usage details:', error.message);
     res.status(500).json({
       success: false,
       error: 'Internal server error',

@@ -1372,12 +1372,42 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Widget _buildSummaryContainer(String content, {String? smallInfo, String? refreshedText}) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final bool isDark = theme.brightness == Brightness.dark;
+
+    final Color backgroundColor = Color.alphaBlend(
+      Colors.black.withOpacity(isDark ? 0.35 : 0.04),
+      colorScheme.surface,
+    );
+    final Color borderColor = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.black.withOpacity(0.05);
+    final TextStyle headerStyle = (theme.textTheme.titleSmall ?? const TextStyle())
+        .copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface);
+    final TextStyle smallInfoStyle =
+        (theme.textTheme.bodySmall ?? const TextStyle()).copyWith(
+      color: colorScheme.onSurface.withOpacity(0.72),
+      fontSize: 12,
+    );
+    final TextStyle refreshedStyle =
+        (theme.textTheme.labelSmall ?? const TextStyle()).copyWith(
+      color: colorScheme.onSurface.withOpacity(0.6),
+      fontSize: 11,
+    );
+    final TextStyle bodyStyle =
+        (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
+      color: colorScheme.onSurface,
+      height: 1.35,
+    );
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1386,34 +1416,22 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                children: const [
-                  Icon(Icons.auto_awesome, size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'AI Summary',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                children: [
+                  Icon(Icons.auto_awesome, size: 16, color: colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text('AI Summary', style: headerStyle),
                 ],
               ),
               if (smallInfo != null && smallInfo.isNotEmpty)
-                Text(
-                  smallInfo,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                ),
+                Text(smallInfo, style: smallInfoStyle),
             ],
           ),
           if (refreshedText != null && refreshedText.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(
-              refreshedText,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-            ),
+            Text(refreshedText, style: refreshedStyle),
           ],
           const SizedBox(height: 6),
-          SelectableText(
-            content,
-            style: const TextStyle(height: 1.35),
-          ),
+          SelectableText(content, style: bodyStyle),
         ],
       ),
     );

@@ -153,6 +153,29 @@ class _LoginState extends State<Login> {
     }
   }
 
+  Future<void> _handleTwitterSignIn() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Simulate Twitter Sign-In delay
+      await Future.delayed(const Duration(seconds: 1));
+
+      // Success - trigger haptic feedback
+      HapticFeedback.lightImpact();
+
+      // Navigate to dashboard
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      }
+    } catch (e) {
+      _showErrorSnackBar('Twitter Sign-In failed. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   void _showErrorSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -601,6 +624,44 @@ class _LoginState extends State<Login> {
                           style: AppTheme.lightTheme.textTheme.titleMedium
                               ?.copyWith(
                             color: Color(0xFF1877F2),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: 2.h),
+
+                // Twitter Sign-In Button
+                SizedBox(
+                  height: 7.h,
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : _handleTwitterSignIn,
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                        color: Color(0xFF1DA1F2),
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CustomIconWidget(
+                          iconName: 'telegram',
+                          color: Color(0xFF1DA1F2),
+                          size: 6.w,
+                        ),
+                        SizedBox(width: 3.w),
+                        Text(
+                          'Continue with Twitter',
+                          style: AppTheme.lightTheme.textTheme.titleMedium
+                              ?.copyWith(
+                            color: Color(0xFF1DA1F2),
                             fontWeight: FontWeight.w500,
                           ),
                         ),

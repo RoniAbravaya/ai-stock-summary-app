@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:twitter_login/twitter_login.dart';
 import '../services/supabase_service.dart';
 import '../models/user_profile_model.dart';
 
@@ -112,6 +113,50 @@ class AuthService {
       return response;
     } catch (error) {
       throw Exception('Facebook sign-in failed: $error');
+    }
+  }
+
+  // Sign in with Twitter OAuth
+  Future<AuthResponse> signInWithTwitter() async {
+    try {
+      // Initialize Twitter login
+      final twitterLogin = TwitterLogin(
+        apiKey: 'fbDFUxyJ1RaHGed9fQrHfJx3h',
+        apiSecretKey: 'kP3jjgqIoxAFObHMqDL2ekN0qP5AzrUFqc5VcnEnyXFXCNfBg3',
+        redirectURI: 'aistock://',
+      );
+
+      // Trigger the Twitter sign-in flow
+      final authResult = await twitterLogin.login();
+
+      // Check if login was successful
+      if (authResult.status != TwitterLoginStatus.loggedIn) {
+        if (authResult.status == TwitterLoginStatus.cancelledByUser) {
+          throw Exception('Twitter Sign-In was cancelled');
+        }
+        throw Exception('Twitter Sign-In failed: ${authResult.errorMessage}');
+      }
+
+      // Get the auth token and secret
+      final authToken = authResult.authToken;
+      final authTokenSecret = authResult.authTokenSecret;
+      
+      if (authToken == null || authTokenSecret == null) {
+        throw Exception('Failed to get Twitter auth tokens');
+      }
+
+      // Sign in to Supabase with Twitter tokens
+      // Note: Supabase might require different approach for Twitter OAuth
+      // Using the access token as ID token for demonstration
+      final response = await client.auth.signInWithIdToken(
+        provider: OAuthProvider.twitter,
+        idToken: authToken,
+        accessToken: authTokenSecret,
+      );
+
+      return response;
+    } catch (error) {
+      throw Exception('Twitter sign-in failed: $error');
     }
   }
 

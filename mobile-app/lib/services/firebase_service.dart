@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:twitter_login/twitter_login.dart';
 // import 'user_data_service.dart'; // Removed
 
 /// Firebase Service for Flutter
@@ -824,6 +825,117 @@ class FirebaseService {
       return userCredential;
     } catch (e) {
       print('❌ Error signing in with Facebook: $e');
+
+      // Check if this is a known type casting error similar to Google Sign-In
+      if (e.toString().contains('List<Object?>') &&
+          e.toString().contains('PigeonUserDetails')) {
+        print(
+          '⚠️ Type casting issue detected - this is a known Firebase plugin bug',
+        );
+
+        // The authentication was actually successful, just the return type casting failed
+        if (_auth?.currentUser != null) {
+          print('✅ Authentication still successful despite type casting error');
+
+          // Ensure user document is properly created/updated
+          if (_isFirestoreAvailable) {
+            try {
+              await _updateUserDocumentSafely(_auth!.currentUser!);
+              
+              // Store any pending FCM token
+              await _storePendingFCMToken();
+              
+              // Ensure FCM token exists
+              final hasToken = await ensureFCMTokenExists();
+              if (!hasToken) {
+                print('⚠️ FCM token refresh failed after type cast error recovery');
+              }
+            } catch (docError) {
+              print(
+                '⚠️ User document update failed after type cast error: $docError',
+              );
+            }
+          }
+
+          // Setup admin user after successful authentication
+          await _setupAdminUserAfterAuth();
+
+          // Return success even though there was a type casting error
+          return Future.value(auth.currentUser as UserCredential);
+        }
+      }
+
+      rethrow;
+    }
+  }
+
+  /// Sign in with Twitter
+  Future<UserCredential> signInWithTwitter() async {
+    try {
+      print('🔄 Starting Twitter Sign-In...');
+
+      // Initialize Twitter login
+      final twitterLogin = TwitterLogin(
+        apiKey: 'fbDFUxyJ1RaHGed9fQrHfJx3h',
+        apiSecretKey: 'kP3jjgqIoxAFObHMqDL2ekN0qP5AzrUFqc5VcnEnyXFXCNfBg3',
+        redirectURI: 'new-flutter-ai://',
+      );
+
+      // Trigger the Twitter sign-in flow
+      final authResult = await twitterLogin.login();
+
+      // Check if login was successful
+      if (authResult.status != TwitterLoginStatus.loggedIn) {
+        if (authResult.status == TwitterLoginStatus.cancelledByUser) {
+          throw Exception('Twitter Sign-In was cancelled');
+        }
+        throw Exception('Twitter Sign-In failed: ${authResult.errorMessage}');
+      }
+
+      // Get the auth token and secret
+      final authToken = authResult.authToken;
+      final authTokenSecret = authResult.authTokenSecret;
+      
+      if (authToken == null || authTokenSecret == null) {
+        throw Exception('Failed to get Twitter auth tokens');
+      }
+
+      // Create a credential from the tokens
+      final AuthCredential credential = TwitterAuthProvider.credential(
+        accessToken: authToken,
+        secret: authTokenSecret,
+      );
+
+      // Sign in to Firebase with the Twitter credential
+      final userCredential = await auth.signInWithCredential(credential);
+      print('✅ Twitter Sign-In successful for: ${userCredential.user?.email}');
+
+      // Check Firestore connection and update/create user document
+      await _checkFirestoreConnection();
+
+      if (_isFirestoreAvailable && userCredential.user != null) {
+        try {
+          await _updateUserDocumentSafely(userCredential.user!);
+          
+          // Store any pending FCM token first
+          await _storePendingFCMToken();
+          
+          // Ensure FCM token exists and refresh if missing
+          final hasToken = await ensureFCMTokenExists();
+          if (!hasToken) {
+            print('⚠️ FCM token refresh failed during Twitter sign-in');
+          }
+        } catch (firestoreError) {
+          print('⚠️ Firestore operations failed: $firestoreError');
+        }
+      }
+
+      // Setup admin user after successful authentication
+      await _setupAdminUserAfterAuth();
+
+      return userCredential;
+    } catch (e) {
+      print('❌ Error signing in with Twitter: $e');
 
       // Check if this is a known type casting error similar to Google Sign-In
       if (e.toString().contains('List<Object?>') &&

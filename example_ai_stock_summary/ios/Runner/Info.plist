@@ -56,6 +56,12 @@
 				<string>fb609450172160549</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>aistock</string>
+			</array>
+		</dict>
 	</array>
 	<key>FacebookAppID</key>
 	<string>609450172160549</string>

@@ -53,6 +53,12 @@
 				<string>fb609450172160549</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>new-flutter-ai</string>
+			</array>
+		</dict>
 	</array>
 	<key>FacebookAppID</key>
 	<string>609450172160549</string>

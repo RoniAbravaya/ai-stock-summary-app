@@ -378,8 +378,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Color(AppConfig.backgroundGray),
+      backgroundColor: isDark ? Colors.grey.shade900 : Color(AppConfig.backgroundGray),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -402,7 +403,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(
                     fontSize: AppTextStyles.headingLarge,
                     fontWeight: FontWeight.bold,
-                    color: Color(AppConfig.textDark),
+                    color: isDark ? Colors.white : Color(AppConfig.textDark),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -411,7 +412,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: AppTextStyles.bodyMedium,
-                    color: Color(AppConfig.textLight),
+                    color: isDark ? Colors.grey.shade400 : Color(AppConfig.textLight),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -435,15 +436,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
+                      color: isDark ? Colors.orange.shade900.withOpacity(0.3) : Colors.orange.shade100,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.shade300),
+                      border: Border.all(
+                        color: isDark ? Colors.orange.shade700 : Colors.orange.shade300,
+                      ),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.info_outline,
-                          color: Colors.orange.shade700,
+                          color: isDark ? Colors.orange.shade300 : Colors.orange.shade700,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -451,7 +454,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Text(
                             'Running in demo mode - Firebase features disabled',
                             style: TextStyle(
-                              color: Colors.orange.shade700,
+                              color: isDark ? Colors.orange.shade200 : Colors.orange.shade700,
                               fontSize: AppTextStyles.bodySmall,
                             ),
                           ),
@@ -601,17 +604,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         side: const BorderSide(color: Color(0xFF1877F2)),
                       ),
                     ),
-                    // Twitter temporarily disabled due to package compatibility
-                    // const SizedBox(height: 12),
-                    // OutlinedButton.icon(
-                    //   onPressed: _isLoading ? null : _signInWithTwitter,
-                    //   icon: const Icon(Icons.telegram),
-                    //   label: const Text('Continue with Twitter'),
-                    //   style: OutlinedButton.styleFrom(
-                    //     foregroundColor: const Color(0xFF1DA1F2),
-                    //     side: const BorderSide(color: Color(0xFF1DA1F2)),
-                    //   ),
-                    // ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _signInWithTwitter,
+                      icon: const Icon(Icons.telegram),
+                      label: const Text('Continue with Twitter'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1DA1F2),
+                        side: const BorderSide(color: Color(0xFF1DA1F2)),
+                      ),
+                    ),
                   ],
                 ],
               ],
@@ -1433,11 +1435,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Widget _buildSummaryContainer(String content, {String? smallInfo, String? refreshedText}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -1459,7 +1462,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               if (smallInfo != null && smallInfo.isNotEmpty)
                 Text(
                   smallInfo,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                  ),
                 ),
             ],
           ),
@@ -1467,7 +1473,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             const SizedBox(height: 4),
             Text(
               refreshedText,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+              ),
             ),
           ],
           const SizedBox(height: 6),

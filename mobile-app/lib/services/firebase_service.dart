@@ -5,8 +5,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-// import 'package:twitter_login/twitter_login.dart';  // Temporarily disabled
-// import 'user_data_service.dart'; // Removed
 
 /// Firebase Service for Flutter
 /// Handles authentication, Firestore operations, and other Firebase services
@@ -769,35 +767,60 @@ class FirebaseService {
   /// Sign in with Facebook
   Future<UserCredential> signInWithFacebook() async {
     try {
-      print('🔄 Starting Facebook Sign-In...');
+      print('📘 ===== FACEBOOK LOGIN STARTED =====');
+      print('🔄 Step 1: Initializing Facebook Sign-In...');
+      print('🔍 Auth instance available: ${_auth != null}');
+      print('🔍 Current user before sign-in: ${_auth?.currentUser?.email ?? "null"}');
 
       // Trigger the Facebook sign-in flow
+      print('🔄 Step 2: Requesting Facebook permissions...');
+      print('📋 Permissions: [email, public_profile]');
+      
       final LoginResult result = await FacebookAuth.instance.login(
         permissions: ['email', 'public_profile'],
       );
 
+      print('✅ Facebook login completed with status: ${result.status}');
+      
       // Check if login was successful
       if (result.status != LoginStatus.success) {
+        print('❌ Facebook login not successful');
         if (result.status == LoginStatus.cancelled) {
+          print('👤 User cancelled Facebook login');
           throw Exception('Facebook Sign-In was cancelled');
         }
+        print('❌ Facebook error message: ${result.message}');
         throw Exception('Facebook Sign-In failed: ${result.message}');
       }
 
       // Get the access token
+      print('🔄 Step 3: Retrieving Facebook access token...');
       final AccessToken? accessToken = result.accessToken;
       if (accessToken == null) {
+        print('❌ Failed to get access token from Facebook');
         throw Exception('Failed to get Facebook access token');
       }
+      print('✅ Access token received');
+      print('🔑 Token: ${accessToken.token.substring(0, 20)}...');
+      print('👤 User ID: ${accessToken.userId}');
 
       // Create a credential from the access token
+      print('🔄 Step 4: Creating Firebase credential from Facebook token...');
       final OAuthCredential credential = FacebookAuthProvider.credential(
         accessToken.token,
       );
+      print('✅ Firebase credential created');
 
       // Sign in to Firebase with the Facebook credential
+      print('🔄 Step 5: Signing in to Firebase with Facebook credential...');
       final userCredential = await auth.signInWithCredential(credential);
-      print('✅ Facebook Sign-In successful for: ${userCredential.user?.email}');
+      
+      print('🎉 Step 6: Firebase sign-in completed!');
+      print('✅ Facebook Sign-In successful!');
+      print('👤 User UID: ${userCredential.user?.uid}');
+      print('📧 User Email: ${userCredential.user?.email ?? "No email"}');
+      print('📛 Display Name: ${userCredential.user?.displayName ?? "No name"}');
+      print('🔗 Provider: ${userCredential.credential?.providerId ?? "Unknown"}');
 
       // Check Firestore connection and update/create user document
       await _checkFirestoreConnection();
@@ -822,9 +845,48 @@ class FirebaseService {
       // Setup admin user after successful authentication
       await _setupAdminUserAfterAuth();
 
+      print('📘 ===== FACEBOOK LOGIN COMPLETED SUCCESSFULLY =====');
       return userCredential;
-    } catch (e) {
-      print('❌ Error signing in with Facebook: $e');
+    } catch (e, stackTrace) {
+      print('📘 ===== FACEBOOK LOGIN ERROR =====');
+      print('❌ Error type: ${e.runtimeType}');
+      print('❌ Error message: $e');
+      print('📍 Error details: ${e.toString()}');
+      
+      // Log specific Firebase Auth errors
+      if (e is FirebaseAuthException) {
+        print('🔥 FirebaseAuthException detected:');
+        print('   - Code: ${e.code}');
+        print('   - Message: ${e.message}');
+        print('   - Plugin: ${e.plugin}');
+        print('   - StackTrace: ${e.stackTrace}');
+      }
+      
+      // Check if account exists with different credential
+      if (e is FirebaseAuthException && e.code == 'account-exists-with-different-credential') {
+        print('🔗 Account exists - attempting to link Facebook to existing account...');
+        
+        final credential = e.credential;
+        if (credential != null) {
+          print('🔑 Facebook credential available, attempting account linking...');
+          
+          throw Exception(
+            'This email is already registered with a different sign-in method. '
+            'Please sign in with your existing account (Google or Email), '
+            'then link Facebook from Settings.',
+          );
+        }
+      }
+      
+      // Check if user cancelled
+      if (e.toString().toLowerCase().contains('cancel') || 
+          e.toString().toLowerCase().contains('abort')) {
+        print('👤 User cancelled the Facebook login');
+      }
+      
+      // Log stack trace for debugging
+      print('📚 Stack trace:');
+      print(stackTrace.toString().split('\n').take(10).join('\n'));
 
       // Check if this is a known type casting error similar to Google Sign-In
       if (e.toString().contains('List<Object?>') &&
@@ -836,6 +898,7 @@ class FirebaseService {
         // The authentication was actually successful, just the return type casting failed
         if (_auth?.currentUser != null) {
           print('✅ Authentication still successful despite type casting error');
+          print('👤 Authenticated user: ${_auth!.currentUser!.email}');
 
           // Ensure user document is properly created/updated
           if (_isFirestoreAvailable) {
@@ -865,55 +928,55 @@ class FirebaseService {
         }
       }
 
+      print('🔄 Checking if user is actually signed in despite error...');
+      print('🔍 Current user after error: ${_auth?.currentUser?.email ?? "null"}');
+      print('🔍 Is user signed in: ${_auth?.currentUser != null}');
+      print('📘 ===== RETHROWING ERROR =====');
+      
       rethrow;
     }
   }
 
   /// Sign in with Twitter
-  /// Note: Temporarily disabled due to package compatibility issues
-  /// Will be re-enabled once twitter_login package is updated
+  /// Note: This requires Firebase Console configuration with your Twitter API credentials
+  /// Configuration needed:
+  /// 1. Go to Firebase Console > Authentication > Sign-in method
+  /// 2. Enable Twitter provider
+  /// 3. Add your Twitter API Key and API Secret
+  /// 4. Add callback URL to Twitter Developer Portal
   Future<UserCredential> signInWithTwitter() async {
-    throw Exception('Twitter sign-in is temporarily unavailable. Please use Google or Facebook sign-in.');
-    
-    /* Temporarily commented out - twitter_login package has Android namespace issues
     try {
-      print('🔄 Starting Twitter Sign-In...');
-
-      // Initialize Twitter login
-      final twitterLogin = TwitterLogin(
-        apiKey: 'fbDFUxyJ1RaHGed9fQrHfJx3h',
-        apiSecretKey: 'kP3jjgqIoxAFObHMqDL2ekN0qP5AzrUFqc5VcnEnyXFXCNfBg3',
-        redirectURI: 'new-flutter-ai://',
-      );
-
-      // Trigger the Twitter sign-in flow
-      final authResult = await twitterLogin.login();
-
-      // Check if login was successful
-      if (authResult.status != TwitterLoginStatus.loggedIn) {
-        if (authResult.status == TwitterLoginStatus.cancelledByUser) {
-          throw Exception('Twitter Sign-In was cancelled');
-        }
-        throw Exception('Twitter Sign-In failed: ${authResult.errorMessage}');
-      }
-
-      // Get the auth token and secret
-      final authToken = authResult.authToken;
-      final authTokenSecret = authResult.authTokenSecret;
+      print('🐦 ===== TWITTER LOGIN STARTED =====');
+      print('🔄 Step 1: Initializing Twitter Sign-In...');
+      print('🔍 Auth instance available: ${_auth != null}');
+      print('🔍 Current user before sign-in: ${_auth?.currentUser?.email ?? "null"}');
       
-      if (authToken == null || authTokenSecret == null) {
-        throw Exception('Failed to get Twitter auth tokens');
-      }
-
-      // Create a credential from the tokens
-      final AuthCredential credential = TwitterAuthProvider.credential(
-        accessToken: authToken,
-        secret: authTokenSecret,
-      );
-
-      // Sign in to Firebase with the Twitter credential
-      final userCredential = await auth.signInWithCredential(credential);
-      print('✅ Twitter Sign-In successful for: ${userCredential.user?.email}');
+      // Create Twitter provider with custom parameters
+      print('🔄 Step 2: Creating TwitterAuthProvider...');
+      final twitterProvider = TwitterAuthProvider();
+      print('✅ TwitterAuthProvider created successfully');
+      
+      // Add custom parameters if needed (e.g., language)
+      print('🔄 Step 3: Setting custom parameters...');
+      twitterProvider.setCustomParameters({
+        'lang': 'en',
+      });
+      print('✅ Custom parameters set');
+      
+      // Use signInWithProvider for both Web and Mobile
+      // Firebase handles platform-specific implementation internally
+      print('🔄 Step 4: Calling signInWithProvider...');
+      print('🌐 This will open a browser/Chrome Custom Tab for Twitter login');
+      
+      final userCredential = await _auth!.signInWithProvider(twitterProvider);
+      
+      print('🎉 Step 5: signInWithProvider returned successfully!');
+      print('✅ Twitter Sign-In successful!');
+      print('👤 User UID: ${userCredential.user?.uid}');
+      print('📧 User Email: ${userCredential.user?.email ?? "No email"}');
+      print('📛 Display Name: ${userCredential.user?.displayName ?? "No name"}');
+      print('🔑 Provider ID: ${userCredential.credential?.providerId ?? "Unknown"}');
+      print('🔗 Sign-in method: ${userCredential.credential?.signInMethod ?? "Unknown"}');
 
       // Check Firestore connection and update/create user document
       await _checkFirestoreConnection();
@@ -938,9 +1001,83 @@ class FirebaseService {
       // Setup admin user after successful authentication
       await _setupAdminUserAfterAuth();
 
+      print('🐦 ===== TWITTER LOGIN COMPLETED SUCCESSFULLY =====');
       return userCredential;
-    } catch (e) {
-      print('❌ Error signing in with Twitter: $e');
+    } catch (e, stackTrace) {
+      print('🐦 ===== TWITTER LOGIN ERROR =====');
+      print('❌ Error type: ${e.runtimeType}');
+      print('❌ Error message: $e');
+      print('📍 Error details: ${e.toString()}');
+      
+      // Log specific Firebase Auth errors
+      if (e is FirebaseAuthException) {
+        print('🔥 FirebaseAuthException detected:');
+        print('   - Code: ${e.code}');
+        print('   - Message: ${e.message}');
+        print('   - Plugin: ${e.plugin}');
+        print('   - StackTrace: ${e.stackTrace}');
+      }
+      
+      // Check if account exists with different credential
+      if (e is FirebaseAuthException && e.code == 'account-exists-with-different-credential') {
+        print('🔗 ===== ACCOUNT EXISTS - ATTEMPTING TO LINK =====');
+        print('📧 An account already exists with this Twitter email');
+        
+        // Get the credential from the error
+        final credential = e.credential;
+        print('🔍 Twitter credential available: ${credential != null}');
+        
+        if (credential != null) {
+          print('🔑 Twitter credential details:');
+          print('   - Provider ID: ${credential.providerId}');
+          print('   - Sign-in method: ${credential.signInMethod}');
+          
+          // Try to get sign-in methods for this email
+          try {
+            print('🔄 Fetching existing sign-in methods for this email...');
+            final email = e.email;
+            if (email != null) {
+              print('📧 Email from error: $email');
+              final methods = await _auth!.fetchSignInMethodsForEmail(email);
+              print('📋 Existing sign-in methods: ${methods.join(", ")}');
+              print('💡 User should sign in with: ${methods.first}');
+            }
+          } catch (fetchError) {
+            print('⚠️ Could not fetch sign-in methods: $fetchError');
+          }
+          
+          print('🔗 Account linking requires user to sign in with existing method first');
+          print('💡 Suggested flow:');
+          print('   1. Sign in with existing method (Google or Email)');
+          print('   2. Go to Settings');
+          print('   3. Link Twitter account');
+          
+          // User needs to sign in with existing provider first, then link
+          throw Exception(
+            'This email is already registered with a different sign-in method. '
+            'Please sign in with your existing account (Google or Email), '
+            'then link Twitter from Settings.',
+          );
+        } else {
+          print('❌ No credential available for account linking');
+        }
+      }
+      
+      // Check if user cancelled
+      if (e.toString().toLowerCase().contains('cancel') || 
+          e.toString().toLowerCase().contains('abort')) {
+        print('👤 User cancelled the Twitter login');
+      }
+      
+      // Check for network issues
+      if (e.toString().toLowerCase().contains('network') ||
+          e.toString().toLowerCase().contains('connection')) {
+        print('🌐 Network/connection issue detected');
+      }
+      
+      // Log stack trace for debugging
+      print('📚 Stack trace:');
+      print(stackTrace.toString().split('\n').take(10).join('\n'));
 
       // Check if this is a known type casting error similar to Google Sign-In
       if (e.toString().contains('List<Object?>') &&
@@ -952,6 +1089,7 @@ class FirebaseService {
         // The authentication was actually successful, just the return type casting failed
         if (_auth?.currentUser != null) {
           print('✅ Authentication still successful despite type casting error');
+          print('👤 Authenticated user: ${_auth!.currentUser!.email}');
 
           // Ensure user document is properly created/updated
           if (_isFirestoreAvailable) {
@@ -981,9 +1119,13 @@ class FirebaseService {
         }
       }
 
+      print('🔄 Checking if user is actually signed in despite error...');
+      print('🔍 Current user after error: ${_auth?.currentUser?.email ?? "null"}');
+      print('🔍 Is user signed in: ${_auth?.currentUser != null}');
+      print('🐦 ===== RETHROWING ERROR =====');
+      
       rethrow;
     }
-    */
   }
 
   /// Setup admin user after authentication

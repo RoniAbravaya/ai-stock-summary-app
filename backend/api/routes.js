@@ -13,6 +13,7 @@ const summaryRoutes = require('./summary');
 const healthRoutes = require('./health');
 const adminRoutes = require('./admin');
 const usersRoutes = require('./users');
+const authConfigRoutes = require('./auth-config');
 
 // Use route modules
 router.use('/news', newsRoutes);
@@ -21,6 +22,7 @@ router.use('/summary', summaryRoutes);
 router.use('/health', healthRoutes);
 router.use('/admin', adminRoutes);
 router.use('/users', usersRoutes);
+router.use('/auth-config', authConfigRoutes);
 
 // API root endpoint
 router.get('/', (req, res) => {

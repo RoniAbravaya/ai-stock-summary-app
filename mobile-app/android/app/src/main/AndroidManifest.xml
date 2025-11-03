@@ -13,6 +13,10 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
         </intent>
+        
+        <!-- Facebook package visibility for Android 11+ -->
+        <package android:name="com.facebook.katana" />
+        <package android:name="com.facebook.orca" />
     </queries>
     
     <application
@@ -69,18 +73,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="@string/fb_login_protocol_scheme" />
-            </intent-filter>
-        </activity>
-        
-        <!-- Twitter OAuth Activity -->
-        <activity
-            android:name="com.github.g_luca.flutter_twitter_login.FlutterTwitterLoginActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="new-flutter-ai" />
             </intent-filter>
         </activity>
         

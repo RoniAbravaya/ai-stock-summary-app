@@ -142,6 +142,124 @@ class ChartDataPoint {
   }
 }
 
+class StockProfile {
+  final String? companyName;
+  final String? sector;
+  final String? industry;
+  final double? marketCap;
+  final double? fiftyTwoWeekHigh;
+  final double? fiftyTwoWeekLow;
+  final String? exchange;
+  final String? exchangeTimezone;
+  final String? country;
+  final String? website;
+  final String? longBusinessSummary;
+
+  const StockProfile({
+    this.companyName,
+    this.sector,
+    this.industry,
+    this.marketCap,
+    this.fiftyTwoWeekHigh,
+    this.fiftyTwoWeekLow,
+    this.exchange,
+    this.exchangeTimezone,
+    this.country,
+    this.website,
+    this.longBusinessSummary,
+  });
+
+  factory StockProfile.fromJson(Map<String, dynamic> json) {
+    double? toDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
+    return StockProfile(
+      companyName: json['companyName']?.toString(),
+      sector: json['sector']?.toString(),
+      industry: json['industry']?.toString(),
+      marketCap: toDouble(json['marketCap']),
+      fiftyTwoWeekHigh: toDouble(json['fiftyTwoWeekHigh']),
+      fiftyTwoWeekLow: toDouble(json['fiftyTwoWeekLow']),
+      exchange: json['exchange']?.toString(),
+      exchangeTimezone: json['exchangeTimezone']?.toString(),
+      country: json['country']?.toString(),
+      website: json['website']?.toString(),
+      longBusinessSummary: json['longBusinessSummary']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'companyName': companyName,
+      'sector': sector,
+      'industry': industry,
+      'marketCap': marketCap,
+      'fiftyTwoWeekHigh': fiftyTwoWeekHigh,
+      'fiftyTwoWeekLow': fiftyTwoWeekLow,
+      'exchange': exchange,
+      'exchangeTimezone': exchangeTimezone,
+      'country': country,
+      'website': website,
+      'longBusinessSummary': longBusinessSummary,
+    };
+  }
+
+  bool get hasWebsite => website != null && website!.isNotEmpty;
+}
+
+class ChartDataPoint {
+  final DateTime date;
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+  final int volume;
+
+  ChartDataPoint({
+    required this.date,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+    required this.volume,
+  });
+
+  factory ChartDataPoint.fromJson(Map<String, dynamic> json) {
+    // Parse date from multiple possible shapes
+    DateTime parsedDate;
+    final dynamic rawTimestamp = json['date_utc'] ?? json['timestamp'];
+    if (rawTimestamp is num) {
+      parsedDate = DateTime.fromMillisecondsSinceEpoch(rawTimestamp.toInt() * 1000);
+    } else if (json['date'] is String) {
+      // ISO string like 2025-07-26
+      parsedDate = DateTime.tryParse(json['date'] as String) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    } else {
+      parsedDate = DateTime.fromMillisecondsSinceEpoch(0);
+    }
+
+    double toDouble(dynamic v) {
+      if (v is num) return v.toDouble();
+      if (v is String) return double.tryParse(v) ?? 0;
+      return 0;
+    }
+
+    return ChartDataPoint(
+      date: parsedDate,
+      open: toDouble(json['open'] ?? json['o']),
+      high: toDouble(json['high'] ?? json['h']),
+      low: toDouble(json['low'] ?? json['l']),
+      close: toDouble(json['close'] ?? json['c'] ?? json['adjClose'] ?? json['Close'] ?? json['price']),
+      volume: (json['volume'] is String)
+          ? (int.tryParse(json['volume']) ?? 0)
+          : (json['volume'] as int? ?? 0),
+    );
+  }
+}
+
 class StockChart {
   final String symbol;
   final String interval;
@@ -234,6 +352,7 @@ class Stock {
   final StockQuote? quote;
   final StockChart? chart;
   final DateTime lastUpdated;
+  final StockProfile? profile;
 
   Stock({
     required this.symbol,
@@ -242,6 +361,7 @@ class Stock {
     this.quote,
     this.chart,
     required this.lastUpdated,
+    this.profile,
   });
 
   factory Stock.fromJson(Map<String, dynamic> json) {
@@ -254,6 +374,9 @@ class Stock {
       lastUpdated: DateTime.fromMillisecondsSinceEpoch(
         json['lastUpdated'] ?? DateTime.now().millisecondsSinceEpoch,
       ),
+      profile: json['profile'] is Map<String, dynamic>
+          ? StockProfile.fromJson(json['profile'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -271,6 +394,7 @@ class Stock {
               'dataPoints': chart!.dataPoints.length,
             }
           : null,
+        'profile': profile?.toJson(),
       'lastUpdated': lastUpdated.millisecondsSinceEpoch,
     };
   }

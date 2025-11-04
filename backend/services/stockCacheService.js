@@ -54,53 +54,56 @@ class StockCacheService {
         };
       }
 
-      // Fetch fresh data from Yahoo Finance
-      console.log(`🔄 Fetching fresh data for ${ticker}`);
-      const [quoteResult, chartResult] = await Promise.all([
-        yahooFinanceService.getBatchQuotes([ticker]),
-        yahooFinanceService.getChartData(ticker, '1d', '1mo')
-      ]);
+        // Fetch fresh data from Yahoo Finance
+        console.log(`🔄 Fetching fresh data for ${ticker}`);
+        const [quoteResult, chartResult, profileResult] = await Promise.all([
+          yahooFinanceService.getBatchQuotes([ticker]),
+          yahooFinanceService.getChartData(ticker, '1d', '1mo'),
+          yahooFinanceService.getCompanyProfile(ticker)
+        ]);
 
-      if (!quoteResult.success && !chartResult.success) {
-        // Both failed, return cached data if available
-        if (cachedData) {
-          console.log(`⚠️ API failed, using stale cached data for ${ticker}`);
+        if (!quoteResult.success && !chartResult.success) {
+          // Both failed, return cached data if available
+          if (cachedData) {
+            console.log(`⚠️ API failed, using stale cached data for ${ticker}`);
+            return {
+              success: true,
+              data: cachedData,
+              source: 'stale_cache',
+              ticker: ticker,
+              warning: 'Using stale data due to API failure'
+            };
+          }
+
           return {
-            success: true,
-            data: cachedData,
-            source: 'stale_cache',
-            ticker: ticker,
-            warning: 'Using stale data due to API failure'
+            success: false,
+            error: 'Failed to fetch data and no cache available',
+            ticker: ticker
           };
         }
-        
+
+        // Prepare stock data object
+        const stockData = {
+          symbol: ticker,
+          name: yahooFinanceService.getStockName(ticker),
+          logo: yahooFinanceService.getCompanyLogo(ticker),
+          quote: quoteResult.success ? quoteResult.data[0] : cachedData?.quote || null,
+          chart: chartResult.success ? chartResult.data : cachedData?.chart || null,
+          profile: profileResult.success ? profileResult.data : cachedData?.profile || null,
+          profileUpdatedAt: profileResult.success ? Date.now() : cachedData?.profileUpdatedAt || null,
+          lastUpdated: Date.now()
+        };
+
+        // Cache the data
+        await this.setCachedStockData(ticker, stockData);
+
+        console.log(`✅ Successfully fetched and cached data for ${ticker}`);
         return {
-          success: false,
-          error: 'Failed to fetch data and no cache available',
+          success: true,
+          data: stockData,
+          source: 'api',
           ticker: ticker
         };
-      }
-
-      // Prepare stock data object
-      const stockData = {
-        symbol: ticker,
-        name: yahooFinanceService.getStockName(ticker),
-        logo: yahooFinanceService.getCompanyLogo(ticker),
-        quote: quoteResult.success ? quoteResult.data[0] : null,
-        chart: chartResult.success ? chartResult.data : null,
-        lastUpdated: Date.now()
-      };
-
-      // Cache the data
-      await this.setCachedStockData(ticker, stockData);
-
-      console.log(`✅ Successfully fetched and cached data for ${ticker}`);
-      return {
-        success: true,
-        data: stockData,
-        source: 'api',
-        ticker: ticker
-      };
 
     } catch (error) {
       console.error(`❌ Error getting stock data for ${ticker}:`, error.message);
@@ -127,6 +130,83 @@ class StockCacheService {
   }
 
   /**
+   * Get cached or fresh company profile for a ticker
+   * @param {string} ticker - Stock ticker symbol
+   * @returns {Promise<Object>} Company profile data
+   */
+  async getStockProfile(ticker) {
+    try {
+      const cachedData = await this.getCachedStockData(ticker);
+      const hasFreshProfile = cachedData?.profile && this.isCacheValid(cachedData.profileUpdatedAt || cachedData.lastUpdated);
+
+      if (hasFreshProfile) {
+        return {
+          success: true,
+          data: cachedData.profile,
+          source: 'cache',
+          ticker: ticker
+        };
+      }
+
+      const profileResult = await yahooFinanceService.getCompanyProfile(ticker);
+
+      if (profileResult.success) {
+        const updatedData = {
+          ...(cachedData || {}),
+          symbol: ticker,
+          profile: profileResult.data,
+          profileUpdatedAt: Date.now(),
+          lastUpdated: cachedData?.lastUpdated || Date.now()
+        };
+
+        await this.setCachedStockData(ticker, updatedData);
+
+        return {
+          success: true,
+          data: profileResult.data,
+          source: profileResult.source || 'api',
+          ticker: ticker
+        };
+      }
+
+      if (cachedData?.profile) {
+        return {
+          success: true,
+          data: cachedData.profile,
+          source: 'stale_cache',
+          ticker: ticker,
+          warning: 'Using cached profile due to fetch failure'
+        };
+      }
+
+      return {
+        success: false,
+        error: profileResult.error || 'Failed to fetch company profile',
+        ticker: ticker
+      };
+    } catch (error) {
+      console.error(`❌ Error getting profile for ${ticker}:`, error.message);
+
+      const cachedData = await this.getCachedStockData(ticker);
+      if (cachedData?.profile) {
+        return {
+          success: true,
+          data: cachedData.profile,
+          source: 'error_fallback_cache',
+          ticker: ticker,
+          warning: 'Using cached profile due to error'
+        };
+      }
+
+      return {
+        success: false,
+        error: error.message,
+        ticker: ticker
+      };
+    }
+  }
+
+  /**
    * Get stock data for multiple tickers (main 20 stocks)
    * @param {Array<string>} tickers - Array of ticker symbols (defaults to main 20)
    * @returns {Promise<Array>} Array of stock data objects
@@ -138,10 +218,12 @@ class StockCacheService {
       const results = [];
       const tickersToFetch = [];
       const cachedResults = [];
+      const existingCache = {};
 
       // Check cache for each ticker
       for (const ticker of tickers) {
         const cachedData = await this.getCachedStockData(ticker);
+        existingCache[ticker] = cachedData;
         if (cachedData && this.isCacheValid(cachedData.lastUpdated)) {
           console.log(`✅ Using cached data for ${ticker}`);
           cachedResults.push({
@@ -176,8 +258,10 @@ class StockCacheService {
               symbol: ticker,
               name: yahooFinanceService.getStockName(ticker),
               logo: yahooFinanceService.getCompanyLogo(ticker),
-              quote: quote,
-              chart: chartResult.success ? chartResult.data : null,
+              quote: quote ?? existingCache[ticker]?.quote ?? null,
+              chart: chartResult.success ? chartResult.data : existingCache[ticker]?.chart ?? null,
+              profile: existingCache[ticker]?.profile || null,
+              profileUpdatedAt: existingCache[ticker]?.profileUpdatedAt || null,
               lastUpdated: Date.now()
             };
 

@@ -4,6 +4,9 @@ import '../services/firebase_service.dart';
 import '../config/app_config.dart';
 import '../models/stock_models.dart';
 import '../widgets/environment_switcher.dart';
+import '../services/stock_profile_repository.dart';
+import '../widgets/stock_brief_info_card.dart';
+import '../services/language_service.dart';
  
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -644,13 +647,16 @@ enum _ChartRange { oneW, oneM }
 
 class _StockDetailsScreenState extends State<StockDetailsScreen> {
   final StockService _stockService = StockService();
+  final StockProfileRepository _stockProfileRepository = StockProfileRepository();
   late Future<Stock> _stockFuture;
+  late Future<StockProfile?> _profileFuture;
   _ChartRange _selectedRange = _ChartRange.oneM;
 
   @override
   void initState() {
     super.initState();
     _stockFuture = _stockService.getStock(widget.symbol);
+    _profileFuture = _stockProfileRepository.fetchProfile(widget.symbol);
   }
 
   @override
@@ -686,7 +692,7 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
           _buildHeader(theme, stock),
           const SizedBox(height: 16),
           _buildChartCard(theme, stock),
-          const SizedBox(height: 16),
+          _buildBriefInfoSection(theme, stock),
           _buildSummaryCard(theme, stock),
           const SizedBox(height: 16),
           _buildActionsRow(stock.symbol),
@@ -953,6 +959,79 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
       case _ChartRange.oneM:
         return points;
     }
+  }
+
+  Widget _buildBriefInfoSection(ThemeData theme, Stock stock) {
+    return FutureBuilder<StockProfile?>(
+      future: _profileFuture,
+      initialData: stock.profile,
+      builder: (context, snapshot) {
+        final profile = snapshot.data ?? stock.profile;
+
+        if (snapshot.connectionState == ConnectionState.waiting && profile == null) {
+          return _buildInfoLoadingCard(theme);
+        }
+
+        if (snapshot.hasError && profile == null) {
+          return _buildInfoErrorCard(theme);
+        }
+
+        if (profile == null) {
+          return const SizedBox.shrink();
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: StockBriefInfoCard(profile: profile),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoLoadingCard(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 2,
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(
+            child: SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.4),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoErrorCard(ThemeData theme) {
+    final language = LanguageService();
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.error_outline, color: theme.colorScheme.error),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  language.translate('stock_brief_error'),
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSummaryCard(ThemeData theme, Stock stock) {

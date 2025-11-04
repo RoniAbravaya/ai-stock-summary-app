@@ -550,6 +550,110 @@ class YahooFinanceService {
   }
 
   /**
+   * Fetch company profile information for a specific ticker
+   * @param {string} ticker - Stock ticker symbol (e.g., 'AAPL')
+   * @returns {Promise<Object>} Company profile data
+   */
+  async getCompanyProfile(ticker) {
+    const upperTicker = ticker?.toUpperCase?.() || ticker;
+
+    if (!this.isConfigured) {
+      console.log(`ℹ️ Using mock company profile for ${upperTicker} (API not configured)`);
+      return {
+        success: true,
+        data: this.getMockCompanyProfile(upperTicker),
+        source: 'mock'
+      };
+    }
+
+    const endpoints = [
+      {
+        url: `${this.baseURL}/api/yahoo/stock/v2/get-profile`,
+        params: { symbol: upperTicker }
+      },
+      {
+        url: `${this.baseURL}/api/v1/markets/stock/modules`,
+        params: {
+          symbol: upperTicker,
+          module: 'assetProfile,summaryProfile,price,summaryDetail'
+        }
+      }
+    ];
+
+    let lastError = null;
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`🏢 Fetching company profile for ${upperTicker} via ${endpoint.url}`);
+        const response = await axios.get(endpoint.url, {
+          params: endpoint.params,
+          headers: this.headers,
+          timeout: 15000
+        });
+
+        if (!response?.data) {
+          continue;
+        }
+
+        const data = response.data;
+        const assetProfile = data.assetProfile || data.summaryProfile || data.profile || data.body?.assetProfile;
+        const summaryProfile = data.summaryProfile || data.body?.summaryProfile;
+        const price = data.price || data.summary?.price || data.body?.price;
+        const summaryDetail = data.summaryDetail || data.body?.summaryDetail || data.details;
+
+        const profileData = {
+          symbol: upperTicker,
+          companyName:
+              price?.longName || price?.shortName || assetProfile?.companyName || summaryProfile?.shortName || upperTicker,
+          sector: assetProfile?.sector || summaryProfile?.sector || price?.sector || null,
+          industry: assetProfile?.industry || summaryProfile?.industry || null,
+          country: assetProfile?.country || summaryProfile?.country || null,
+          website: assetProfile?.website || summaryProfile?.website || null,
+          longBusinessSummary:
+              assetProfile?.longBusinessSummary || summaryProfile?.longBusinessSummary || null,
+          exchange: price?.exchangeName || price?.fullExchangeName || price?.exchange || null,
+          exchangeTimezone: price?.exchangeTimezoneName || price?.exchangeTimezoneShortName || null,
+          marketCap:
+              summaryDetail?.marketCap?.raw ?? price?.marketCap?.raw ?? price?.marketCap ?? null,
+          marketCapFormatted:
+              summaryDetail?.marketCap?.fmt || summaryDetail?.marketCap?.formatted || price?.marketCap?.fmt || null,
+          fiftyTwoWeekHigh:
+              summaryDetail?.fiftyTwoWeekHigh?.raw ?? summaryDetail?.fiftyTwoWeekHigh ?? null,
+          fiftyTwoWeekLow:
+              summaryDetail?.fiftyTwoWeekLow?.raw ?? summaryDetail?.fiftyTwoWeekLow ?? null,
+          employees: assetProfile?.fullTimeEmployees ?? summaryProfile?.fullTimeEmployees ?? null,
+          city: assetProfile?.city || summaryProfile?.city || null,
+          state: assetProfile?.state || summaryProfile?.state || null,
+          fetchedAt: new Date().toISOString()
+        };
+
+        if (profileData.companyName || profileData.sector || profileData.marketCap) {
+          return {
+            success: true,
+            data: profileData,
+            source: data.source || 'api'
+          };
+        }
+      } catch (endpointError) {
+        lastError = endpointError;
+        const message = endpointError?.response?.data?.message || endpointError?.message || endpointError;
+        console.warn(`⚠️ Failed to fetch company profile for ${upperTicker}: ${message}`);
+        continue;
+      }
+    }
+
+    if (lastError) {
+      console.warn(`⚠️ Company profile lookup fallback for ${upperTicker}: ${lastError?.message || lastError}`);
+    }
+
+    return {
+      success: true,
+      data: this.getMockCompanyProfile(upperTicker),
+      source: 'mock_fallback'
+    };
+  }
+
+  /**
    * Get company logo URL (placeholder implementation)
    * @param {string} ticker - Stock ticker symbol
    * @returns {string} Logo URL
@@ -606,6 +710,33 @@ class YahooFinanceService {
       regularMarketDayLow: parseFloat((basePrice - Math.random() * 5).toFixed(2)),
       regularMarketVolume: Math.floor(Math.random() * 10000000) + 1000000,
       marketCap: Math.floor(Math.random() * 1000000000000) + 100000000000
+    };
+  }
+
+  /**
+   * Generate mock company profile data for development
+   * @param {string} ticker - Stock ticker symbol
+   * @returns {Object} Mock company profile data
+   */
+  getMockCompanyProfile(ticker) {
+    return {
+      symbol: ticker,
+      companyName: this.getStockName(ticker),
+      sector: 'Technology',
+      industry: 'Software—Infrastructure',
+      country: 'United States',
+      website: `https://${this.getCompanyDomain(ticker)}`,
+      longBusinessSummary: 'Mock company profile for development purposes.',
+      exchange: 'NASDAQ',
+      exchangeTimezone: 'America/New_York',
+      marketCap: 1230000000000,
+      marketCapFormatted: '$1.23T',
+      fiftyTwoWeekHigh: 200,
+      fiftyTwoWeekLow: 120,
+      employees: 100000,
+      city: 'San Francisco',
+      state: 'CA',
+      fetchedAt: new Date().toISOString()
     };
   }
 

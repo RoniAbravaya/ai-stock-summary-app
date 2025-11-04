@@ -279,6 +279,44 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/stocks/:ticker/profile - Get company profile data
+router.get('/:ticker/profile', async (req, res) => {
+  try {
+    const ticker = req.params.ticker.toUpperCase();
+    console.log(`🏢 GET /api/stocks/${ticker}/profile - Fetching company profile`);
+
+    const result = await stockCacheService.getStockProfile(ticker);
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        data: result.data,
+        ticker: ticker,
+        source: result.source,
+        warning: result.warning,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    console.warn(`⚠️ Failed to get profile for ${ticker}: ${result.error}`);
+    return res.status(404).json({
+      success: false,
+      error: result.error || 'Profile not found',
+      ticker: ticker,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error(`❌ Error in GET /api/stocks/${req.params.ticker}/profile:`, error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message,
+      ticker: req.params.ticker,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // GET /api/stocks/:ticker - Get complete stock data (quote + chart)
 // This MUST be last to avoid catching specific routes like /main, /search, /trending
 router.get('/:ticker', async (req, res) => {

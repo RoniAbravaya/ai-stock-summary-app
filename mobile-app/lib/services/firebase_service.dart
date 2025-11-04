@@ -672,26 +672,218 @@ class FirebaseService {
     }
   }
 
-  /// Sign in with Google
+  /// Central function to handle OAuth sign-in with automatic account linking
+  /// Handles the "account-exists-with-different-credential" error by:
+  /// 1. Detecting the error when a user tries to sign in with a provider for an email that's already registered
+  /// 2. Signing in with the existing provider for that email
+  /// 3. Linking the new provider credential to the existing account
+  Future<UserCredential> _signInOrLink(
+    Future<UserCredential> Function() signInAttempt,
+    String providerName,
+  ) async {
+    try {
+      // 1) Normal sign-in (no collision)
+      return await signInAttempt();
+    } on FirebaseAuthException catch (e) {
+      // 2) Email is already on a different provider
+      if (e.code == 'account-exists-with-different-credential') {
+        print('🔗 ===== ACCOUNT LINKING STARTED =====');
+        print('📧 Email already exists with a different sign-in method');
+        
+        final pendingCred = e.credential;
+        final email = e.email;
+
+        print('🔍 Pending credential: ${pendingCred != null ? pendingCred.providerId : "null"}');
+        print('📧 Email from error: ${email ?? "null"}');
+
+        if (pendingCred == null || email == null) {
+          print('❌ Missing credential or email, cannot proceed with linking');
+          rethrow;
+        }
+
+        // --- IMPORTANT ---
+        // fetchSignInMethodsForEmail may be disabled by Email Enumeration Protection.
+        // If this throws, we'll need to prompt the user to choose their provider.
+        List<String> methods = [];
+        
+        try {
+          print('🔄 Fetching existing sign-in methods for email...');
+          methods = await _auth!.fetchSignInMethodsForEmail(email);
+          print('📋 Existing sign-in methods found: ${methods.join(", ")}');
+        } catch (fetchError) {
+          print('⚠️ fetchSignInMethodsForEmail failed (Email Enumeration Protection may be enabled): $fetchError');
+          // Fall back to prompting user or trying common providers
+          print('💡 Will need user to manually select their existing sign-in method');
+          
+          // For now, throw a user-friendly error
+          throw Exception(
+            'This email is already registered. Please sign in with your existing method first.\n'
+            'If you don\'t remember which method you used, try Google or Email/Password.\n'
+            'After signing in, you can link $providerName from Settings.',
+          );
+        }
+
+        if (methods.isEmpty) {
+          print('⚠️ No sign-in methods returned, cannot proceed');
+          throw Exception(
+            'This email is already registered but we cannot determine your sign-in method.\n'
+            'Please contact support or try signing in with your existing account first.',
+          );
+        }
+
+        print('🔄 Attempting to sign in with existing provider: ${methods.first}');
+        
+        // 2a) Sign in with the existing provider
+        UserCredential existing;
+        try {
+          if (methods.contains('google.com')) {
+            print('🔑 Existing provider is Google, initiating Google sign-in...');
+            existing = await _signInWithGoogleCredential();
+          } else if (methods.contains('facebook.com')) {
+            print('🔑 Existing provider is Facebook, initiating Facebook sign-in...');
+            existing = await _signInWithFacebookCredential();
+          } else if (methods.contains('twitter.com')) {
+            print('🔑 Existing provider is Twitter, initiating Twitter sign-in...');
+            existing = await _signInWithTwitterCredential();
+          } else if (methods.contains('password')) {
+            print('🔑 Existing provider is Email/Password');
+            throw Exception(
+              'This email is registered with Email/Password.\n'
+              'Please sign in with your email and password first,\n'
+              'then link $providerName from Settings.',
+            );
+          } else {
+            print('❌ Unknown sign-in method: ${methods.first}');
+            throw Exception(
+              'This email is registered with ${methods.first}.\n'
+              'Please sign in with that method first,\n'
+              'then link $providerName from Settings.',
+            );
+          }
+          
+          print('✅ Successfully signed in with existing provider');
+        } catch (signInError) {
+          print('❌ Failed to sign in with existing provider: $signInError');
+          
+          // If sign-in failed, provide helpful error message
+          if (signInError.toString().contains('cancel')) {
+            throw Exception('Sign-in cancelled. Account linking was not completed.');
+          }
+          
+          throw Exception(
+            'Could not sign in with your existing account to link $providerName.\n'
+            'Please sign in with your existing method manually first.',
+          );
+        }
+
+        // 3) Link the new credential to the existing account
+        try {
+          print('🔄 Linking $providerName credential to existing account...');
+          await existing.user!.linkWithCredential(pendingCred);
+          print('✅ Successfully linked $providerName to your account!');
+          print('🎉 You can now sign in with either provider');
+          
+          // Update user document after linking
+          if (_isFirestoreAvailable && existing.user != null) {
+            try {
+              await _updateUserDocumentSafely(existing.user!);
+            } catch (firestoreError) {
+              print('⚠️ Firestore update failed after linking: $firestoreError');
+            }
+          }
+          
+          print('🔗 ===== ACCOUNT LINKING COMPLETED SUCCESSFULLY =====');
+          
+          // 4) Done: future logins via either provider work
+          return existing;
+        } catch (linkError) {
+          print('❌ Failed to link credential: $linkError');
+          
+          // Linking failed, but user is still signed in with existing provider
+          print('⚠️ Linking failed, but you are signed in with your existing account');
+          
+          // Return the existing credential since user is authenticated
+          return existing;
+        }
+      }
+      
+      // Other FirebaseAuth errors
+      rethrow;
+    }
+  }
+
+  /// Internal method to get Google credential and sign in
+  Future<UserCredential> _signInWithGoogleCredential() async {
+    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+    
+    if (googleUser == null) {
+      throw Exception('Google Sign-In was cancelled');
+    }
+
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    return await auth.signInWithCredential(credential);
+  }
+
+  /// Internal method to get Facebook credential and sign in
+  Future<UserCredential> _signInWithFacebookCredential() async {
+    final LoginResult result = await FacebookAuth.instance.login(
+      permissions: ['email', 'public_profile'],
+    );
+    
+    if (result.status != LoginStatus.success) {
+      throw Exception('Facebook Sign-In failed: ${result.message}');
+    }
+
+    final AccessToken? accessToken = result.accessToken;
+    if (accessToken == null) {
+      throw Exception('Failed to get Facebook access token');
+    }
+
+    final OAuthCredential credential = FacebookAuthProvider.credential(
+      accessToken.token,
+    );
+
+    return await auth.signInWithCredential(credential);
+  }
+
+  /// Internal method to get Twitter credential and sign in
+  Future<UserCredential> _signInWithTwitterCredential() async {
+    final twitterProvider = TwitterAuthProvider();
+    twitterProvider.setCustomParameters({'lang': 'en'});
+    
+    return await _auth!.signInWithProvider(twitterProvider);
+  }
+
+  /// Sign in with Google - with automatic account linking
   Future<UserCredential> signInWithGoogle() async {
     try {
       print('🔄 Starting Google Sign-In...');
 
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      // Use the centralized sign-in or link function
+      final userCredential = await _signInOrLink(() async {
+        final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
-      if (googleUser == null) {
-        throw Exception('Google Sign-In was cancelled');
-      }
+        if (googleUser == null) {
+          throw Exception('Google Sign-In was cancelled');
+        }
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
 
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
 
-      final userCredential = await auth.signInWithCredential(credential);
+        return await auth.signInWithCredential(credential);
+      }, 'Google');
+
       print('✅ Google Sign-In successful for: ${userCredential.user?.email}');
 
       // Check Firestore connection and update/create user document
@@ -764,7 +956,7 @@ class FirebaseService {
     }
   }
 
-  /// Sign in with Facebook
+  /// Sign in with Facebook - with automatic account linking
   Future<UserCredential> signInWithFacebook() async {
     try {
       print('📘 ===== FACEBOOK LOGIN STARTED =====');
@@ -772,48 +964,51 @@ class FirebaseService {
       print('🔍 Auth instance available: ${_auth != null}');
       print('🔍 Current user before sign-in: ${_auth?.currentUser?.email ?? "null"}');
 
-      // Trigger the Facebook sign-in flow
-      print('🔄 Step 2: Requesting Facebook permissions...');
-      print('📋 Permissions: [email, public_profile]');
-      
-      final LoginResult result = await FacebookAuth.instance.login(
-        permissions: ['email', 'public_profile'],
-      );
+      // Use the centralized sign-in or link function
+      final userCredential = await _signInOrLink(() async {
+        // Trigger the Facebook sign-in flow
+        print('🔄 Step 2: Requesting Facebook permissions...');
+        print('📋 Permissions: [email, public_profile]');
+        
+        final LoginResult result = await FacebookAuth.instance.login(
+          permissions: ['email', 'public_profile'],
+        );
 
-      print('✅ Facebook login completed with status: ${result.status}');
-      
-      // Check if login was successful
-      if (result.status != LoginStatus.success) {
-        print('❌ Facebook login not successful');
-        if (result.status == LoginStatus.cancelled) {
-          print('👤 User cancelled Facebook login');
-          throw Exception('Facebook Sign-In was cancelled');
+        print('✅ Facebook login completed with status: ${result.status}');
+        
+        // Check if login was successful
+        if (result.status != LoginStatus.success) {
+          print('❌ Facebook login not successful');
+          if (result.status == LoginStatus.cancelled) {
+            print('👤 User cancelled Facebook login');
+            throw Exception('Facebook Sign-In was cancelled');
+          }
+          print('❌ Facebook error message: ${result.message}');
+          throw Exception('Facebook Sign-In failed: ${result.message}');
         }
-        print('❌ Facebook error message: ${result.message}');
-        throw Exception('Facebook Sign-In failed: ${result.message}');
-      }
 
-      // Get the access token
-      print('🔄 Step 3: Retrieving Facebook access token...');
-      final AccessToken? accessToken = result.accessToken;
-      if (accessToken == null) {
-        print('❌ Failed to get access token from Facebook');
-        throw Exception('Failed to get Facebook access token');
-      }
-      print('✅ Access token received');
-      print('🔑 Token: ${accessToken.token.substring(0, 20)}...');
-      print('👤 User ID: ${accessToken.userId}');
+        // Get the access token
+        print('🔄 Step 3: Retrieving Facebook access token...');
+        final AccessToken? accessToken = result.accessToken;
+        if (accessToken == null) {
+          print('❌ Failed to get access token from Facebook');
+          throw Exception('Failed to get Facebook access token');
+        }
+        print('✅ Access token received');
+        print('🔑 Token: ${accessToken.token.substring(0, 20)}...');
+        print('👤 User ID: ${accessToken.userId}');
 
-      // Create a credential from the access token
-      print('🔄 Step 4: Creating Firebase credential from Facebook token...');
-      final OAuthCredential credential = FacebookAuthProvider.credential(
-        accessToken.token,
-      );
-      print('✅ Firebase credential created');
+        // Create a credential from the access token
+        print('🔄 Step 4: Creating Firebase credential from Facebook token...');
+        final OAuthCredential credential = FacebookAuthProvider.credential(
+          accessToken.token,
+        );
+        print('✅ Firebase credential created');
 
-      // Sign in to Firebase with the Facebook credential
-      print('🔄 Step 5: Signing in to Firebase with Facebook credential...');
-      final userCredential = await auth.signInWithCredential(credential);
+        // Sign in to Firebase with the Facebook credential
+        print('🔄 Step 5: Signing in to Firebase with Facebook credential...');
+        return await auth.signInWithCredential(credential);
+      }, 'Facebook');
       
       print('🎉 Step 6: Firebase sign-in completed!');
       print('✅ Facebook Sign-In successful!');
@@ -860,22 +1055,6 @@ class FirebaseService {
         print('   - Message: ${e.message}');
         print('   - Plugin: ${e.plugin}');
         print('   - StackTrace: ${e.stackTrace}');
-      }
-      
-      // Check if account exists with different credential
-      if (e is FirebaseAuthException && e.code == 'account-exists-with-different-credential') {
-        print('🔗 Account exists - attempting to link Facebook to existing account...');
-        
-        final credential = e.credential;
-        if (credential != null) {
-          print('🔑 Facebook credential available, attempting account linking...');
-          
-          throw Exception(
-            'This email is already registered with a different sign-in method. '
-            'Please sign in with your existing account (Google or Email), '
-            'then link Facebook from Settings.',
-          );
-        }
       }
       
       // Check if user cancelled
@@ -937,7 +1116,7 @@ class FirebaseService {
     }
   }
 
-  /// Sign in with Twitter
+  /// Sign in with Twitter - with automatic account linking
   /// Note: This requires Firebase Console configuration with your Twitter API credentials
   /// Configuration needed:
   /// 1. Go to Firebase Console > Authentication > Sign-in method
@@ -951,24 +1130,27 @@ class FirebaseService {
       print('🔍 Auth instance available: ${_auth != null}');
       print('🔍 Current user before sign-in: ${_auth?.currentUser?.email ?? "null"}');
       
-      // Create Twitter provider with custom parameters
-      print('🔄 Step 2: Creating TwitterAuthProvider...');
-      final twitterProvider = TwitterAuthProvider();
-      print('✅ TwitterAuthProvider created successfully');
-      
-      // Add custom parameters if needed (e.g., language)
-      print('🔄 Step 3: Setting custom parameters...');
-      twitterProvider.setCustomParameters({
-        'lang': 'en',
-      });
-      print('✅ Custom parameters set');
-      
-      // Use signInWithProvider for both Web and Mobile
-      // Firebase handles platform-specific implementation internally
-      print('🔄 Step 4: Calling signInWithProvider...');
-      print('🌐 This will open a browser/Chrome Custom Tab for Twitter login');
-      
-      final userCredential = await _auth!.signInWithProvider(twitterProvider);
+      // Use the centralized sign-in or link function
+      final userCredential = await _signInOrLink(() async {
+        // Create Twitter provider with custom parameters
+        print('🔄 Step 2: Creating TwitterAuthProvider...');
+        final twitterProvider = TwitterAuthProvider();
+        print('✅ TwitterAuthProvider created successfully');
+        
+        // Add custom parameters if needed (e.g., language)
+        print('🔄 Step 3: Setting custom parameters...');
+        twitterProvider.setCustomParameters({
+          'lang': 'en',
+        });
+        print('✅ Custom parameters set');
+        
+        // Use signInWithProvider for both Web and Mobile
+        // Firebase handles platform-specific implementation internally
+        print('🔄 Step 4: Calling signInWithProvider...');
+        print('🌐 This will open a browser/Chrome Custom Tab for Twitter login');
+        
+        return await _auth!.signInWithProvider(twitterProvider);
+      }, 'Twitter');
       
       print('🎉 Step 5: signInWithProvider returned successfully!');
       print('✅ Twitter Sign-In successful!');
@@ -1016,51 +1198,6 @@ class FirebaseService {
         print('   - Message: ${e.message}');
         print('   - Plugin: ${e.plugin}');
         print('   - StackTrace: ${e.stackTrace}');
-      }
-      
-      // Check if account exists with different credential
-      if (e is FirebaseAuthException && e.code == 'account-exists-with-different-credential') {
-        print('🔗 ===== ACCOUNT EXISTS - ATTEMPTING TO LINK =====');
-        print('📧 An account already exists with this Twitter email');
-        
-        // Get the credential from the error
-        final credential = e.credential;
-        print('🔍 Twitter credential available: ${credential != null}');
-        
-        if (credential != null) {
-          print('🔑 Twitter credential details:');
-          print('   - Provider ID: ${credential.providerId}');
-          print('   - Sign-in method: ${credential.signInMethod}');
-          
-          // Try to get sign-in methods for this email
-          try {
-            print('🔄 Fetching existing sign-in methods for this email...');
-            final email = e.email;
-            if (email != null) {
-              print('📧 Email from error: $email');
-              final methods = await _auth!.fetchSignInMethodsForEmail(email);
-              print('📋 Existing sign-in methods: ${methods.join(", ")}');
-              print('💡 User should sign in with: ${methods.first}');
-            }
-          } catch (fetchError) {
-            print('⚠️ Could not fetch sign-in methods: $fetchError');
-          }
-          
-          print('🔗 Account linking requires user to sign in with existing method first');
-          print('💡 Suggested flow:');
-          print('   1. Sign in with existing method (Google or Email)');
-          print('   2. Go to Settings');
-          print('   3. Link Twitter account');
-          
-          // User needs to sign in with existing provider first, then link
-          throw Exception(
-            'This email is already registered with a different sign-in method. '
-            'Please sign in with your existing account (Google or Email), '
-            'then link Twitter from Settings.',
-          );
-        } else {
-          print('❌ No credential available for account linking');
-        }
       }
       
       // Check if user cancelled

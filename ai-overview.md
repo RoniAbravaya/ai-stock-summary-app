@@ -27,7 +27,8 @@
 - **Storage Bucket**: `new-flutter-ai.firebasestorage.app`
 
 ### Services Used
-- Firebase Authentication (with Google Sign-In)
+- Firebase Authentication (with Google, Facebook, Twitter Sign-In)
+  - **Automatic Account Linking**: When "One account per email" is enabled, the app automatically links social sign-in providers if a user tries to sign in with a different provider for an existing email address
 - Cloud Firestore Database
 - Firebase Cloud Messaging (FCM)
 - Firebase Storage
@@ -348,6 +349,30 @@ firebase firestore:data:read users
 - Cache frequently accessed data locally
 - Clean up processed notifications periodically
 
+## Authentication & Account Linking
+
+### Social Sign-In Providers
+- **Google Sign-In**: OAuth 2.0 with automatic account linking
+- **Facebook Sign-In**: OAuth with automatic account linking
+- **Twitter Sign-In**: OAuth with automatic account linking
+- **Email/Password**: Traditional authentication
+
+### Automatic Account Linking
+The app implements automatic account linking to handle the Firebase "One account per email" restriction:
+
+1. **How it works**: When a user tries to sign in with a provider (e.g., Facebook) using an email already registered with another provider (e.g., Google), the system:
+   - Detects the `account-exists-with-different-credential` error
+   - Automatically prompts the user to sign in with their existing provider
+   - Links the new provider credential to the existing account
+   - Allows future sign-ins with either provider
+
+2. **Implementation**: See `/workspace/ACCOUNT_LINKING_FIX.md` for detailed documentation
+
+3. **Fallbacks**: 
+   - Handles Email Enumeration Protection
+   - Provides clear error messages when automatic linking fails
+   - Gracefully handles user cancellation
+
 ## Next Steps
 
 ### Planned Enhancements
@@ -355,4 +380,5 @@ firebase firestore:data:read users
 2. Scheduled notifications
 3. A/B testing for notification content
 4. Analytics integration for delivery tracking
-5. Topic-based messaging for categories 
+5. Topic-based messaging for categories
+6. UI improvements for account linking (success notifications, provider management) 

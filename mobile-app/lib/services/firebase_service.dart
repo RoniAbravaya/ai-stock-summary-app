@@ -681,126 +681,247 @@ class FirebaseService {
     Future<UserCredential> Function() signInAttempt,
     String providerName,
   ) async {
+    print('🔵 _signInOrLink called for provider: $providerName');
+    
     try {
+      print('🔵 Step 1: Attempting normal sign-in with $providerName...');
       // 1) Normal sign-in (no collision)
-      return await signInAttempt();
+      final result = await signInAttempt();
+      print('✅ Normal sign-in successful - no account conflict detected');
+      return result;
     } on FirebaseAuthException catch (e) {
+      print('🔴 FirebaseAuthException caught!');
+      print('   Error code: ${e.code}');
+      print('   Error message: ${e.message}');
+      print('   Error plugin: ${e.plugin}');
+      
       // 2) Email is already on a different provider
       if (e.code == 'account-exists-with-different-credential') {
-        print('🔗 ===== ACCOUNT LINKING STARTED =====');
-        print('📧 Email already exists with a different sign-in method');
+        print('');
+        print('🔗 ===== ACCOUNT LINKING FLOW STARTED =====');
+        print('📧 Account conflict detected: Email already exists with different provider');
+        print('🎯 Attempting automatic account linking...');
+        print('');
         
         final pendingCred = e.credential;
         final email = e.email;
 
-        print('🔍 Pending credential: ${pendingCred != null ? pendingCred.providerId : "null"}');
-        print('📧 Email from error: ${email ?? "null"}');
+        print('🔍 Extracted from error:');
+        print('   Pending credential exists: ${pendingCred != null}');
+        if (pendingCred != null) {
+          print('   Pending credential provider: ${pendingCred.providerId}');
+          print('   Pending credential sign-in method: ${pendingCred.signInMethod}');
+        }
+        print('   Email from error: ${email ?? "NOT PROVIDED"}');
+        print('');
 
-        if (pendingCred == null || email == null) {
-          print('❌ Missing credential or email, cannot proceed with linking');
+        if (pendingCred == null) {
+          print('❌ CRITICAL: Pending credential is NULL - cannot proceed with linking');
+          print('   This is unusual - Firebase should provide the credential in the error');
+          rethrow;
+        }
+        
+        if (email == null) {
+          print('❌ CRITICAL: Email is NULL - cannot proceed with linking');
+          print('   This is unusual - Firebase should provide the email in the error');
           rethrow;
         }
 
         // --- IMPORTANT ---
         // fetchSignInMethodsForEmail may be disabled by Email Enumeration Protection.
-        // If this throws, we'll need to prompt the user to choose their provider.
+        // If this throws, we'll try all common providers automatically.
         List<String> methods = [];
+        bool enumProtectionEnabled = false;
         
         try {
-          print('🔄 Fetching existing sign-in methods for email...');
+          print('🔄 Step 2: Fetching existing sign-in methods for email: $email');
           methods = await _auth!.fetchSignInMethodsForEmail(email);
-          print('📋 Existing sign-in methods found: ${methods.join(", ")}');
+          print('✅ fetchSignInMethodsForEmail succeeded!');
+          print('📋 Existing sign-in methods: ${methods.isEmpty ? "NONE" : methods.join(", ")}');
+          print('');
         } catch (fetchError) {
-          print('⚠️ fetchSignInMethodsForEmail failed (Email Enumeration Protection may be enabled): $fetchError');
-          // Fall back to prompting user or trying common providers
-          print('💡 Will need user to manually select their existing sign-in method');
+          print('⚠️ fetchSignInMethodsForEmail FAILED!');
+          print('   Error type: ${fetchError.runtimeType}');
+          print('   Error: $fetchError');
+          print('   Reason: Email Enumeration Protection is likely ENABLED in Firebase Console');
+          print('   📍 Firebase Console → Authentication → Settings → Email Enumeration Protection');
+          print('');
+          print('🔄 Fallback: Will try common providers automatically...');
+          enumProtectionEnabled = true;
           
-          // For now, throw a user-friendly error
-          throw Exception(
-            'This email is already registered. Please sign in with your existing method first.\n'
-            'If you don\'t remember which method you used, try Google or Email/Password.\n'
-            'After signing in, you can link $providerName from Settings.',
-          );
+          // Try to determine provider from Firestore user data as fallback
+          try {
+            print('🔍 Attempting to find user in Firestore by email...');
+            final usersQuery = await firestore
+                .collection('users')
+                .where('email', isEqualTo: email.toLowerCase())
+                .limit(1)
+                .get();
+            
+            if (usersQuery.docs.isNotEmpty) {
+              final userData = usersQuery.docs.first.data();
+              print('✅ Found user in Firestore!');
+              print('   User data: ${userData.keys.join(", ")}');
+              
+              // Check if we can determine the provider from user data
+              // This is a fallback - might not always work
+              if (userData.containsKey('photoURL') && userData['photoURL'] != null) {
+                final photoUrl = userData['photoURL'].toString();
+                if (photoUrl.contains('googleusercontent.com')) {
+                  methods.add('google.com');
+                  print('   📊 Detected Google sign-in from photoURL');
+                } else if (photoUrl.contains('facebook.com') || photoUrl.contains('fbcdn.net')) {
+                  methods.add('facebook.com');
+                  print('   📊 Detected Facebook sign-in from photoURL');
+                }
+              }
+            } else {
+              print('⚠️ User not found in Firestore');
+            }
+          } catch (firestoreError) {
+            print('⚠️ Firestore fallback failed: $firestoreError');
+          }
+          print('');
+        }
+
+        // If we still have no methods, try all common providers
+        if (methods.isEmpty && enumProtectionEnabled) {
+          print('⚠️ No sign-in methods detected - will try all common providers');
+          print('   Strategy: Try Google → Facebook → Twitter in sequence');
+          methods = ['google.com', 'facebook.com', 'twitter.com'];
+          print('');
         }
 
         if (methods.isEmpty) {
-          print('⚠️ No sign-in methods returned, cannot proceed');
+          print('❌ CRITICAL: No sign-in methods available');
+          print('   Cannot proceed with automatic linking');
+          print('');
           throw Exception(
             'This email is already registered but we cannot determine your sign-in method.\n'
             'Please contact support or try signing in with your existing account first.',
           );
         }
 
-        print('🔄 Attempting to sign in with existing provider: ${methods.first}');
+        print('🔄 Step 3: Signing in with existing provider...');
+        print('   Will try methods in order: ${methods.join(" → ")}');
+        print('');
         
         // 2a) Sign in with the existing provider
-        UserCredential existing;
-        try {
-          if (methods.contains('google.com')) {
-            print('🔑 Existing provider is Google, initiating Google sign-in...');
-            existing = await _signInWithGoogleCredential();
-          } else if (methods.contains('facebook.com')) {
-            print('🔑 Existing provider is Facebook, initiating Facebook sign-in...');
-            existing = await _signInWithFacebookCredential();
-          } else if (methods.contains('twitter.com')) {
-            print('🔑 Existing provider is Twitter, initiating Twitter sign-in...');
-            existing = await _signInWithTwitterCredential();
-          } else if (methods.contains('password')) {
-            print('🔑 Existing provider is Email/Password');
-            throw Exception(
-              'This email is registered with Email/Password.\n'
-              'Please sign in with your email and password first,\n'
-              'then link $providerName from Settings.',
-            );
-          } else {
-            print('❌ Unknown sign-in method: ${methods.first}');
-            throw Exception(
-              'This email is registered with ${methods.first}.\n'
-              'Please sign in with that method first,\n'
-              'then link $providerName from Settings.',
-            );
+        UserCredential? existing;
+        String? successfulMethod;
+        
+        for (String method in methods) {
+          try {
+            print('🔑 Attempting sign-in with: $method');
+            
+            if (method == 'google.com') {
+              print('   📱 Launching Google sign-in flow...');
+              existing = await _signInWithGoogleCredential();
+              successfulMethod = 'Google';
+            } else if (method == 'facebook.com') {
+              print('   📱 Launching Facebook sign-in flow...');
+              existing = await _signInWithFacebookCredential();
+              successfulMethod = 'Facebook';
+            } else if (method == 'twitter.com') {
+              print('   📱 Launching Twitter sign-in flow...');
+              existing = await _signInWithTwitterCredential();
+              successfulMethod = 'Twitter';
+            } else if (method == 'password') {
+              print('   🔑 Existing provider is Email/Password');
+              print('   ❌ Cannot auto-link with password provider - requires user input');
+              throw Exception(
+                'This email is registered with Email/Password.\n'
+                'Please sign in with your email and password first,\n'
+                'then link $providerName from Settings.',
+              );
+            } else {
+              print('   ⚠️ Unknown method: $method - skipping');
+              continue;
+            }
+            
+            print('✅ Sign-in with $successfulMethod successful!');
+            print('   User: ${existing?.user?.email}');
+            print('   UID: ${existing?.user?.uid}');
+            break; // Success - exit loop
+            
+          } catch (signInError) {
+            print('❌ Sign-in with $method failed: $signInError');
+            
+            // If user cancelled, stop trying
+            if (signInError.toString().toLowerCase().contains('cancel')) {
+              print('👤 User cancelled the sign-in - stopping automatic linking');
+              throw Exception('Sign-in cancelled. Account linking was not completed.');
+            }
+            
+            // If this was the last method, throw error
+            if (method == methods.last) {
+              print('❌ All sign-in methods exhausted - automatic linking failed');
+              throw Exception(
+                'Could not sign in with your existing account to link $providerName.\n'
+                'Please sign in with your existing method manually first.',
+              );
+            }
+            
+            // Otherwise, try next method
+            print('   🔄 Trying next method...');
+            continue;
           }
-          
-          print('✅ Successfully signed in with existing provider');
-        } catch (signInError) {
-          print('❌ Failed to sign in with existing provider: $signInError');
-          
-          // If sign-in failed, provide helpful error message
-          if (signInError.toString().contains('cancel')) {
-            throw Exception('Sign-in cancelled. Account linking was not completed.');
-          }
-          
-          throw Exception(
-            'Could not sign in with your existing account to link $providerName.\n'
-            'Please sign in with your existing method manually first.',
-          );
         }
+        
+        if (existing == null) {
+          print('❌ CRITICAL: Sign-in succeeded but UserCredential is null');
+          throw Exception('Authentication failed unexpectedly');
+        }
+        
+        print('');
+        print('✅ Step 3 Complete: Successfully authenticated with existing provider ($successfulMethod)');
+        print('');
 
         // 3) Link the new credential to the existing account
         try {
-          print('🔄 Linking $providerName credential to existing account...');
+          print('🔄 Step 4: Linking $providerName credential to existing account...');
+          print('   Existing user: ${existing.user?.email}');
+          print('   Existing UID: ${existing.user?.uid}');
+          print('   New credential provider: ${pendingCred.providerId}');
+          print('');
+          
           await existing.user!.linkWithCredential(pendingCred);
-          print('✅ Successfully linked $providerName to your account!');
-          print('🎉 You can now sign in with either provider');
+          
+          print('');
+          print('✅✅✅ SUCCESS! Credential linking completed!');
+          print('🎉 $providerName is now linked to your account!');
+          print('🎉 You can now sign in with either $successfulMethod OR $providerName');
+          print('');
           
           // Update user document after linking
           if (_isFirestoreAvailable && existing.user != null) {
             try {
+              print('🔄 Updating user document in Firestore...');
               await _updateUserDocumentSafely(existing.user!);
+              print('✅ Firestore update complete');
             } catch (firestoreError) {
               print('⚠️ Firestore update failed after linking: $firestoreError');
+              print('   (This is non-critical - linking was still successful)');
             }
           }
           
+          print('');
           print('🔗 ===== ACCOUNT LINKING COMPLETED SUCCESSFULLY =====');
+          print('');
           
           // 4) Done: future logins via either provider work
           return existing;
         } catch (linkError) {
-          print('❌ Failed to link credential: $linkError');
+          print('');
+          print('❌ Step 4 FAILED: Credential linking error!');
+          print('   Error type: ${linkError.runtimeType}');
+          print('   Error: $linkError');
+          print('');
           
           // Linking failed, but user is still signed in with existing provider
           print('⚠️ Linking failed, but you are signed in with your existing account');
+          print('   User can try linking again from Settings');
+          print('');
           
           // Return the existing credential since user is authenticated
           return existing;
@@ -808,6 +929,12 @@ class FirebaseService {
       }
       
       // Other FirebaseAuth errors
+      print('🔴 Different FirebaseAuth error (not account-exists): ${e.code}');
+      rethrow;
+    } catch (e) {
+      print('🔴 Non-FirebaseAuth exception caught in _signInOrLink!');
+      print('   Error type: ${e.runtimeType}');
+      print('   Error: $e');
       rethrow;
     }
   }

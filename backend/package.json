@@ -10,7 +10,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "populate-cache": "node scripts/populate-cache.js",
-    "upload-play": "node scripts/upload-to-play.js"
+    "upload-play": "node scripts/upload-to-play.js",
+    "set-admin-claims": "node scripts/set-admin-claims.js"
   },
   "keywords": [
     "nodejs",

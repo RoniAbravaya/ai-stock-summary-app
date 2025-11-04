@@ -8,6 +8,7 @@ import 'services/mock_data_service.dart';
 import 'services/language_service.dart';
 import 'services/feature_flag_service.dart';
 import 'services/stock_service.dart';
+import 'services/summary_service.dart';
 import 'models/stock_models.dart';
 import 'config/app_config.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -15,8 +16,11 @@ import 'screens/language_settings_screen.dart';
 import 'screens/notification_settings_screen.dart';
 import 'screens/news_screen.dart';
 import 'screens/stocks_screen.dart';
+import 'screens/support_page.dart';
+import 'screens/admin_support_list_screen.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
+import 'package:share_plus/share_plus.dart';
 
 // Top-level function to handle background messages
 @pragma('vm:entry-point')
@@ -1134,6 +1138,7 @@ class FavoritesScreen extends StatefulWidget {
 class _FavoritesScreenState extends State<FavoritesScreen> {
   // Per-stock local state to avoid cross-item bleed of UI and animations
   final Map<String, bool> _isGeneratingByStock = {};
+  final Map<String, bool> _isSharingByStock = {};
   // Local content shown immediately after generation, until server content arrives
   final Map<String, String> _localSummaryByStock = {};
   // For each stock, the server summary's updatedAt must be after this time to supersede local content
@@ -1142,6 +1147,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   final Map<String, Future<Stock>> _stockFutureCache = {};
   // Optional: cache summary streams (reduces rebuild-side re-subscription churn)
   final Map<String, Stream<DocumentSnapshot>> _summaryStreams = {};
+  final SummaryService _summaryService = SummaryService();
 
   @override
   Widget build(BuildContext context) {
@@ -1256,6 +1262,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   Widget _buildFavoriteCard(BuildContext context, String stockId) {
     final bool isGenerating = _isGeneratingByStock[stockId] ?? false;
+    final bool isSharing = _isSharingByStock[stockId] ?? false;
     return Card(
       key: ValueKey<String>(stockId),
       margin: const EdgeInsets.only(bottom: 12),
@@ -1274,9 +1281,25 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     fontSize: 18,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => _removeFromFavorites(context, stockId),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: LanguageService().translate('favorites_share_label'),
+                      icon: isSharing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2.4),
+                            )
+                          : const Icon(Icons.ios_share),
+                      onPressed: isSharing ? null : () => _shareFavoriteStock(stockId),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => _removeFromFavorites(context, stockId),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1334,6 +1357,87 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         );
       },
     );
+  }
+
+  Future<void> _shareFavoriteStock(String stockId) async {
+    if (_isSharingByStock[stockId] == true) return;
+
+    setState(() {
+      _isSharingByStock[stockId] = true;
+    });
+
+    try {
+      String? summary = _localSummaryByStock[stockId];
+      summary ??= await _summaryService.getCachedSummary(stockId);
+
+      if (summary == null || summary.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(LanguageService().translate('favorites_share_generating')),
+            ),
+          );
+        }
+        summary = await _summaryService.ensureSummary(stockId, generateIfMissing: true);
+      }
+
+      if (summary == null || summary.isEmpty) {
+        throw Exception(LanguageService().translate('favorites_share_missing'));
+      }
+
+      final String clippedSummary = _truncateSummary(summary, 500);
+
+      String? companyName;
+      try {
+        final future = _stockFutureCache.putIfAbsent(stockId, () => StockService().getStock(stockId));
+        final stock = await future;
+        companyName = stock.name.isNotEmpty ? stock.name : stock.symbol;
+      } catch (_) {
+        companyName = stockId;
+      }
+
+      final lines = <String>[
+        '$stockId — $companyName',
+        'Summary: $clippedSummary',
+        'Learn more: https://finance.yahoo.com/quote/$stockId',
+        'Shared via AI Stock Summary',
+      ];
+
+      await Share.share(
+        lines.join('\n'),
+        subject: '$stockId — $companyName',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            LanguageService().translateWithParams(
+              'favorites_share_error',
+              {'error': error.toString()},
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isSharingByStock.remove(stockId);
+      });
+    }
+  }
+
+  String _truncateSummary(String content, int maxLength) {
+    if (content.length <= maxLength) {
+      return content;
+    }
+    const ellipsis = '...';
+    final safeLength = maxLength > ellipsis.length ? maxLength - ellipsis.length : maxLength;
+    return content.substring(0, safeLength).trimRight() + ellipsis;
   }
 
   Widget _buildSummaryContent(String stockId) {
@@ -1587,7 +1691,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         final isUp = stock.isPositiveChange;
         final color = isUp ? Colors.green : Colors.red;
         final chart = stock.chart;
-        final points = (chart?.dataPoints ?? []);
+        final List<ChartDataPoint> points =
+            chart?.dataPoints ?? const <ChartDataPoint>[];
         List<Widget> rowChildren = [
           Expanded(
             child: SizedBox(
@@ -2339,10 +2444,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _openHelpSupport(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(LanguageService().translate('settings_help_coming')),
-      ),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const SupportPage()),
     );
   }
 
@@ -2426,7 +2529,7 @@ class _AdminScreenState extends State<AdminScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -2447,10 +2550,11 @@ class _AdminScreenState extends State<AdminScreen>
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(icon: Icon(Icons.notifications), text: 'Notifications'),
-            Tab(icon: Icon(Icons.people), text: 'Users'),
-            Tab(icon: Icon(Icons.analytics), text: 'Statistics'),
+          tabs: [
+            const Tab(icon: Icon(Icons.notifications), text: 'Notifications'),
+            const Tab(icon: Icon(Icons.people), text: 'Users'),
+            const Tab(icon: Icon(Icons.analytics), text: 'Statistics'),
+            Tab(icon: const Icon(Icons.support_agent), text: LanguageService().translate('admin_support_tab')),
           ],
         ),
       ),
@@ -2460,6 +2564,7 @@ class _AdminScreenState extends State<AdminScreen>
           NotificationsTab(firebaseEnabled: widget.firebaseEnabled),
           UserManagementTab(firebaseEnabled: widget.firebaseEnabled),
           StatisticsTab(firebaseEnabled: widget.firebaseEnabled),
+          AdminSupportListPage(),
         ],
       ),
     );

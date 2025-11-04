@@ -142,6 +142,75 @@ class ChartDataPoint {
   }
 }
 
+class StockProfile {
+  final String? companyName;
+  final String? sector;
+  final String? industry;
+  final double? marketCap;
+  final double? fiftyTwoWeekHigh;
+  final double? fiftyTwoWeekLow;
+  final String? exchange;
+  final String? exchangeTimezone;
+  final String? country;
+  final String? website;
+  final String? longBusinessSummary;
+
+  const StockProfile({
+    this.companyName,
+    this.sector,
+    this.industry,
+    this.marketCap,
+    this.fiftyTwoWeekHigh,
+    this.fiftyTwoWeekLow,
+    this.exchange,
+    this.exchangeTimezone,
+    this.country,
+    this.website,
+    this.longBusinessSummary,
+  });
+
+  factory StockProfile.fromJson(Map<String, dynamic> json) {
+    double? toDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
+    return StockProfile(
+      companyName: json['companyName']?.toString(),
+      sector: json['sector']?.toString(),
+      industry: json['industry']?.toString(),
+      marketCap: toDouble(json['marketCap']),
+      fiftyTwoWeekHigh: toDouble(json['fiftyTwoWeekHigh']),
+      fiftyTwoWeekLow: toDouble(json['fiftyTwoWeekLow']),
+      exchange: json['exchange']?.toString(),
+      exchangeTimezone: json['exchangeTimezone']?.toString(),
+      country: json['country']?.toString(),
+      website: json['website']?.toString(),
+      longBusinessSummary: json['longBusinessSummary']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'companyName': companyName,
+      'sector': sector,
+      'industry': industry,
+      'marketCap': marketCap,
+      'fiftyTwoWeekHigh': fiftyTwoWeekHigh,
+      'fiftyTwoWeekLow': fiftyTwoWeekLow,
+      'exchange': exchange,
+      'exchangeTimezone': exchangeTimezone,
+      'country': country,
+      'website': website,
+      'longBusinessSummary': longBusinessSummary,
+    };
+  }
+
+  bool get hasWebsite => website != null && website!.isNotEmpty;
+}
+
 class StockChart {
   final String symbol;
   final String interval;
@@ -221,8 +290,9 @@ class StockChart {
   }
 
   double? get priceChangePercent {
-    if (priceChange == null || previousPrice == null || previousPrice == 0)
+    if (priceChange == null || previousPrice == null || previousPrice == 0) {
       return null;
+    }
     return (priceChange! / previousPrice!) * 100;
   }
 }
@@ -234,6 +304,7 @@ class Stock {
   final StockQuote? quote;
   final StockChart? chart;
   final DateTime lastUpdated;
+  final StockProfile? profile;
 
   Stock({
     required this.symbol,
@@ -242,6 +313,7 @@ class Stock {
     this.quote,
     this.chart,
     required this.lastUpdated,
+    this.profile,
   });
 
   factory Stock.fromJson(Map<String, dynamic> json) {
@@ -254,6 +326,9 @@ class Stock {
       lastUpdated: DateTime.fromMillisecondsSinceEpoch(
         json['lastUpdated'] ?? DateTime.now().millisecondsSinceEpoch,
       ),
+      profile: json['profile'] is Map<String, dynamic>
+          ? StockProfile.fromJson(json['profile'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -271,6 +346,7 @@ class Stock {
               'dataPoints': chart!.dataPoints.length,
             }
           : null,
+      'profile': profile?.toJson(),
       'lastUpdated': lastUpdated.millisecondsSinceEpoch,
     };
   }

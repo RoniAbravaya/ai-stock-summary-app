@@ -40,7 +40,10 @@ router.get('/main', async (req, res) => {
     const results = await stockCacheService.getMainStocksData();
     const successfulResults = results.filter(result => result.success);
     
-    console.log(`✅ Successfully returned ${successfulResults.length}/${results.length} main stocks`);
+    console.log('✅ Successfully returned main stocks', {
+      successCount: successfulResults.length,
+      total: results.length
+    });
     res.json({
       success: true,
       data: successfulResults.map(result => result.data),
@@ -52,7 +55,7 @@ router.get('/main', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('❌ Error in GET /api/stocks/main:', error);
+    console.error('❌ Error in GET /api/stocks/main', { error });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -69,7 +72,11 @@ router.get('/:ticker/chart', async (req, res) => {
     const interval = req.query.interval || '1d';
     const range = req.query.range || '1mo';
     
-    console.log(`📈 GET /api/stocks/${ticker}/chart - Fetching chart data (${interval}, ${range})`);
+    console.log('📈 GET /api/stocks/chart - Fetching chart data', {
+      ticker,
+      interval,
+      range
+    });
     
     // Check if mock data is enabled
     if (process.env.ENABLE_MOCK_DATA === 'true') {
@@ -90,7 +97,7 @@ router.get('/:ticker/chart', async (req, res) => {
     const result = await yahooFinanceService.getChartData(ticker, interval, range);
     
     if (result.success) {
-      console.log(`✅ Successfully returned chart data for ${ticker}`);
+      console.log('✅ Successfully returned chart data', { ticker });
       res.json({
         success: true,
         data: result.data,
@@ -101,7 +108,10 @@ router.get('/:ticker/chart', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     } else {
-      console.warn(`⚠️ Failed to get chart data for ${ticker}: ${result.error}`);
+      console.warn('⚠️ Failed to get chart data', {
+        ticker,
+        error: result.error
+      });
       res.status(404).json({
         success: false,
         error: result.error,
@@ -112,7 +122,10 @@ router.get('/:ticker/chart', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error(`❌ Error in GET /api/stocks/${req.params.ticker}/chart:`, error);
+    console.error('❌ Error in GET /api/stocks/chart', {
+      ticker: req.params.ticker,
+      error
+    });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -127,7 +140,7 @@ router.get('/:ticker/chart', async (req, res) => {
 router.get('/search', async (req, res) => {
   try {
     const query = req.query.q;
-    console.log(`🔍 GET /api/stocks/search?q=${query} - Enhanced stock search`);
+    console.log('🔍 GET /api/stocks/search - Enhanced stock search', { query });
     
     if (!query) {
       return res.status(400).json({
@@ -155,7 +168,10 @@ router.get('/search', async (req, res) => {
     const result = await stockCacheService.searchStocks(query);
     
     if (result.success) {
-      console.log(`✅ Found ${result.data.length} search results for "${query}"`);
+      console.log('✅ Found search results', {
+        query,
+        count: result.data.length
+      });
       res.json({
         success: true,
         data: result.data,
@@ -165,7 +181,10 @@ router.get('/search', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     } else {
-      console.warn(`⚠️ Search failed for "${query}": ${result.error}`);
+      console.warn('⚠️ Search failed', {
+        query,
+        error: result.error
+      });
       res.status(500).json({
         success: false,
         error: result.error,
@@ -174,7 +193,10 @@ router.get('/search', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error(`❌ Error in GET /api/stocks/search:`, error);
+    console.error('❌ Error in GET /api/stocks/search', {
+      query: req.query.q,
+      error
+    });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -214,7 +236,9 @@ router.get('/trending', async (req, res) => {
       rank: index + 1
     }));
     
-    console.log(`✅ Successfully returned ${trendingStocks.length} trending stocks`);
+    console.log('✅ Successfully returned trending stocks', {
+      count: trendingStocks.length
+    });
     res.json({
       success: true,
       data: trendingStocks,
@@ -223,7 +247,7 @@ router.get('/trending', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('❌ Error in GET /api/stocks/trending:', error);
+    console.error('❌ Error in GET /api/stocks/trending', { error });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -260,7 +284,9 @@ router.get('/', async (req, res) => {
       isMainStock: true
     }));
     
-    console.log(`✅ Successfully returned ${stocks.length} available stocks`);
+    console.log('✅ Successfully returned available stocks', {
+      count: stocks.length
+    });
     res.json({
       success: true,
       data: stocks,
@@ -269,11 +295,55 @@ router.get('/', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('❌ Error in GET /api/stocks:', error);
+    console.error('❌ Error in GET /api/stocks', { error });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
       message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// GET /api/stocks/:ticker/profile - Get company profile data
+router.get('/:ticker/profile', async (req, res) => {
+  try {
+    const ticker = req.params.ticker.toUpperCase();
+    console.log('🏢 GET /api/stocks/profile - Fetching company profile', { ticker });
+
+    const result = await stockCacheService.getStockProfile(ticker);
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        data: result.data,
+        ticker: ticker,
+        source: result.source,
+        warning: result.warning,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    console.warn('⚠️ Failed to get profile for ticker', {
+      ticker,
+      error: result.error
+    });
+    return res.status(404).json({
+      success: false,
+      error: result.error || 'Profile not found',
+      ticker: ticker,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error in GET /api/stocks/profile', {
+      ticker: req.params.ticker,
+      error
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message,
+      ticker: req.params.ticker,
       timestamp: new Date().toISOString()
     });
   }
@@ -284,7 +354,7 @@ router.get('/', async (req, res) => {
 router.get('/:ticker', async (req, res) => {
   try {
     const ticker = req.params.ticker.toUpperCase();
-    console.log(`📊 GET /api/stocks/${ticker} - Fetching complete stock data`);
+    console.log('📊 GET /api/stocks - Fetching complete stock data', { ticker });
     
     // Check if mock data is enabled
     if (process.env.ENABLE_MOCK_DATA === 'true') {
@@ -311,7 +381,7 @@ router.get('/:ticker', async (req, res) => {
     const result = await stockCacheService.getStockData(ticker);
     
     if (result.success) {
-      console.log(`✅ Successfully returned complete data for ${ticker}`);
+      console.log('✅ Successfully returned complete data', { ticker });
       res.json({
         success: true,
         data: result.data,
@@ -321,7 +391,10 @@ router.get('/:ticker', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     } else {
-      console.warn(`⚠️ Failed to get data for ${ticker}: ${result.error}`);
+      console.warn('⚠️ Failed to get stock data', {
+        ticker,
+        error: result.error
+      });
       res.status(404).json({
         success: false,
         error: result.error,
@@ -330,7 +403,10 @@ router.get('/:ticker', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error(`❌ Error in GET /api/stocks/${req.params.ticker}:`, error);
+    console.error('❌ Error in GET /api/stocks', {
+      ticker: req.params.ticker,
+      error
+    });
     res.status(500).json({
       success: false,
       error: 'Internal server error',

@@ -34,7 +34,7 @@ class SummaryService {
         return null;
       }
 
-      final data = doc.data() as Map<String, dynamic>?;
+      final data = doc.data();
       final content = data?['content']?.toString().trim();
       if (content == null || content.isEmpty) {
         return null;

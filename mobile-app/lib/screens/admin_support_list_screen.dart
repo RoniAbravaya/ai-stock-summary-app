@@ -64,7 +64,6 @@ class _SupportListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final language = LanguageService();
     final theme = Theme.of(context);
     final dateFormat = DateFormat.yMMMd().add_jm();
     final subtitle = '${ticket.userEmail}\n${dateFormat.format(ticket.createdAt)}';

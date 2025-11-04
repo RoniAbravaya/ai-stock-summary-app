@@ -290,8 +290,9 @@ class StockChart {
   }
 
   double? get priceChangePercent {
-    if (priceChange == null || previousPrice == null || previousPrice == 0)
+    if (priceChange == null || previousPrice == null || previousPrice == 0) {
       return null;
+    }
     return (priceChange! / previousPrice!) * 100;
   }
 }
@@ -345,7 +346,7 @@ class Stock {
               'dataPoints': chart!.dataPoints.length,
             }
           : null,
-        'profile': profile?.toJson(),
+      'profile': profile?.toJson(),
       'lastUpdated': lastUpdated.millisecondsSinceEpoch,
     };
   }

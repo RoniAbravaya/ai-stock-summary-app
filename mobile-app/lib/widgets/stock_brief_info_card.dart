@@ -185,11 +185,20 @@ class _InfoRowWidget extends StatelessWidget {
                   style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  row.value,
-                  style: valueStyle?.copyWith(
-                    color: isPlaceholder ? theme.textTheme.bodySmall?.color : valueStyle?.color,
-                  ),
+                Builder(
+                  builder: (_) {
+                    final Color? resolvedColor = isPlaceholder
+                        ? theme.textTheme.bodySmall?.color
+                        : valueStyle?.color ?? theme.textTheme.bodyMedium?.color;
+                    final TextStyle? effectiveStyle = valueStyle != null
+                        ? valueStyle!.copyWith(color: resolvedColor)
+                        : theme.textTheme.bodyMedium?.copyWith(color: resolvedColor);
+
+                    return Text(
+                      row.value,
+                      style: effectiveStyle,
+                    );
+                  },
                 ),
               ],
             ),

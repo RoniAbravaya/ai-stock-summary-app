@@ -1691,7 +1691,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         final isUp = stock.isPositiveChange;
         final color = isUp ? Colors.green : Colors.red;
         final chart = stock.chart;
-        final points = (chart?.dataPoints ?? []);
+        final List<ChartDataPoint> points =
+            chart?.dataPoints ?? const <ChartDataPoint>[];
         List<Widget> rowChildren = [
           Expanded(
             child: SizedBox(

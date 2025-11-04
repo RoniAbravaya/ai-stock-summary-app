@@ -211,55 +211,6 @@ class StockProfile {
   bool get hasWebsite => website != null && website!.isNotEmpty;
 }
 
-class ChartDataPoint {
-  final DateTime date;
-  final double open;
-  final double high;
-  final double low;
-  final double close;
-  final int volume;
-
-  ChartDataPoint({
-    required this.date,
-    required this.open,
-    required this.high,
-    required this.low,
-    required this.close,
-    required this.volume,
-  });
-
-  factory ChartDataPoint.fromJson(Map<String, dynamic> json) {
-    // Parse date from multiple possible shapes
-    DateTime parsedDate;
-    final dynamic rawTimestamp = json['date_utc'] ?? json['timestamp'];
-    if (rawTimestamp is num) {
-      parsedDate = DateTime.fromMillisecondsSinceEpoch(rawTimestamp.toInt() * 1000);
-    } else if (json['date'] is String) {
-      // ISO string like 2025-07-26
-      parsedDate = DateTime.tryParse(json['date'] as String) ?? DateTime.fromMillisecondsSinceEpoch(0);
-    } else {
-      parsedDate = DateTime.fromMillisecondsSinceEpoch(0);
-    }
-
-    double toDouble(dynamic v) {
-      if (v is num) return v.toDouble();
-      if (v is String) return double.tryParse(v) ?? 0;
-      return 0;
-    }
-
-    return ChartDataPoint(
-      date: parsedDate,
-      open: toDouble(json['open'] ?? json['o']),
-      high: toDouble(json['high'] ?? json['h']),
-      low: toDouble(json['low'] ?? json['l']),
-      close: toDouble(json['close'] ?? json['c'] ?? json['adjClose'] ?? json['Close'] ?? json['price']),
-      volume: (json['volume'] is String)
-          ? (int.tryParse(json['volume']) ?? 0)
-          : (json['volume'] as int? ?? 0),
-    );
-  }
-}
-
 class StockChart {
   final String symbol;
   final String interval;

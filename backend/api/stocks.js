@@ -8,6 +8,7 @@ const router = express.Router();
 const yahooFinanceService = require('../services/yahooFinanceService');
 const newsCacheService = require('../services/newsCacheService');
 const stockCacheService = require('../services/stockCacheService');
+const stockProfileCacheService = require('../services/stockProfileCacheService');
 const mockData = require('../services/mockData');
 
 // GET /api/stocks/main - Get main 20 stocks with quotes and charts
@@ -305,13 +306,14 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/stocks/:ticker/profile - Get company profile data
+// GET /api/stocks/:ticker/profile - Get company profile data with Firestore caching
 router.get('/:ticker/profile', async (req, res) => {
   try {
     const ticker = req.params.ticker.toUpperCase();
     console.log('🏢 GET /api/stocks/profile - Fetching company profile', { ticker });
 
-    const result = await stockCacheService.getStockProfile(ticker);
+    // Use Firestore cache service for 24-hour caching
+    const result = await stockProfileCacheService.getProfile(ticker);
 
     if (result.success) {
       return res.json({
@@ -319,6 +321,7 @@ router.get('/:ticker/profile', async (req, res) => {
         data: result.data,
         ticker: ticker,
         source: result.source,
+        cachedAt: result.cachedAt,
         warning: result.warning,
         timestamp: new Date().toISOString()
       });

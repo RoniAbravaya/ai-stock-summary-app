@@ -110,5 +110,11 @@ service cloud.firestore {
       // Allow creation by the user or admin services
       allow create: if isOwner(userId) || isAdmin();
     }
+
+    // Stock profiles cache - read-only for authenticated users
+    match /stockProfiles/{ticker} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only backend can write via admin SDK
+    }
   }
 }

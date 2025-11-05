@@ -551,6 +551,7 @@ class YahooFinanceService {
 
   /**
    * Fetch company profile information for a specific ticker
+   * Uses RapidAPI Yahoo Finance endpoint with proper module parameters
    * @param {string} ticker - Stock ticker symbol (e.g., 'AAPL')
    * @returns {Promise<Object>} Company profile data
    */
@@ -566,91 +567,95 @@ class YahooFinanceService {
       };
     }
 
-    const endpoints = [
-      {
-        url: `${this.baseURL}/api/yahoo/stock/v2/get-profile`,
-        params: { symbol: upperTicker }
-      },
-      {
-        url: `${this.baseURL}/api/v1/markets/stock/modules`,
-        params: {
-          symbol: upperTicker,
-          module: 'assetProfile,summaryProfile,price,summaryDetail'
-        }
+    try {
+      // Use the correct RapidAPI endpoint with module parameter
+      const url = `${this.baseURL}/api/v1/markets/stock/modules`;
+      const params = {
+        ticker: upperTicker,
+        module: 'asset-profile,financial-data,statistics'
+      };
+
+      console.log(`🏢 Fetching comprehensive profile for ${upperTicker}`);
+      const response = await axios.get(url, {
+        params: params,
+        headers: this.headers,
+        timeout: 15000
+      });
+
+      if (!response?.data) {
+        throw new Error('No data received from API');
       }
-    ];
 
-    let lastError = null;
+      const data = response.data;
+      
+      // Extract data from different modules
+      const assetProfile = data.assetProfile || {};
+      const financialData = data.financialData || {};
+      const statistics = data.defaultKeyStatistics || {};
 
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`🏢 Fetching company profile for ${upperTicker} via ${endpoint.url}`);
-        const response = await axios.get(endpoint.url, {
-          params: endpoint.params,
-          headers: this.headers,
-          timeout: 15000
-        });
+      // Build comprehensive profile data
+      const profileData = {
+        symbol: upperTicker,
+        
+        // Basic company info from assetProfile
+        companyName: assetProfile.companyName || upperTicker,
+        sector: assetProfile.sector || null,
+        industry: assetProfile.industry || null,
+        country: assetProfile.country || null,
+        city: assetProfile.city || null,
+        state: assetProfile.state || null,
+        website: assetProfile.website || null,
+        longBusinessSummary: assetProfile.longBusinessSummary || null,
+        employees: assetProfile.fullTimeEmployees || null,
+        
+        // Market data from financialData
+        currentPrice: financialData.currentPrice?.raw || null,
+        targetMeanPrice: financialData.targetMeanPrice?.raw || null,
+        marketCap: financialData.marketCap?.raw || statistics.marketCap?.raw || null,
+        marketCapFormatted: financialData.marketCap?.fmt || statistics.marketCap?.fmt || null,
+        
+        // Key statistics
+        fiftyTwoWeekHigh: statistics.fiftyTwoWeekHigh?.raw || null,
+        fiftyTwoWeekLow: statistics.fiftyTwoWeekLow?.raw || null,
+        beta: statistics.beta?.raw || null,
+        peRatio: statistics.forwardPE?.raw || null,
+        
+        // Financial metrics
+        revenueGrowth: financialData.revenueGrowth?.raw || null,
+        earningsGrowth: financialData.earningsGrowth?.raw || null,
+        profitMargins: financialData.profitMargins?.raw || null,
+        returnOnEquity: financialData.returnOnEquity?.raw || null,
+        
+        // Exchange info (fallback to generic)
+        exchange: 'NYSE/NASDAQ',
+        exchangeTimezone: 'America/New_York',
+        
+        fetchedAt: new Date().toISOString()
+      };
 
-        if (!response?.data) {
-          continue;
-        }
-
-        const data = response.data;
-        const assetProfile = data.assetProfile || data.summaryProfile || data.profile || data.body?.assetProfile;
-        const summaryProfile = data.summaryProfile || data.body?.summaryProfile;
-        const price = data.price || data.summary?.price || data.body?.price;
-        const summaryDetail = data.summaryDetail || data.body?.summaryDetail || data.details;
-
-        const profileData = {
-          symbol: upperTicker,
-          companyName:
-              price?.longName || price?.shortName || assetProfile?.companyName || summaryProfile?.shortName || upperTicker,
-          sector: assetProfile?.sector || summaryProfile?.sector || price?.sector || null,
-          industry: assetProfile?.industry || summaryProfile?.industry || null,
-          country: assetProfile?.country || summaryProfile?.country || null,
-          website: assetProfile?.website || summaryProfile?.website || null,
-          longBusinessSummary:
-              assetProfile?.longBusinessSummary || summaryProfile?.longBusinessSummary || null,
-          exchange: price?.exchangeName || price?.fullExchangeName || price?.exchange || null,
-          exchangeTimezone: price?.exchangeTimezoneName || price?.exchangeTimezoneShortName || null,
-          marketCap:
-              summaryDetail?.marketCap?.raw ?? price?.marketCap?.raw ?? price?.marketCap ?? null,
-          marketCapFormatted:
-              summaryDetail?.marketCap?.fmt || summaryDetail?.marketCap?.formatted || price?.marketCap?.fmt || null,
-          fiftyTwoWeekHigh:
-              summaryDetail?.fiftyTwoWeekHigh?.raw ?? summaryDetail?.fiftyTwoWeekHigh ?? null,
-          fiftyTwoWeekLow:
-              summaryDetail?.fiftyTwoWeekLow?.raw ?? summaryDetail?.fiftyTwoWeekLow ?? null,
-          employees: assetProfile?.fullTimeEmployees ?? summaryProfile?.fullTimeEmployees ?? null,
-          city: assetProfile?.city || summaryProfile?.city || null,
-          state: assetProfile?.state || summaryProfile?.state || null,
-          fetchedAt: new Date().toISOString()
+      // Validate we got useful data
+      if (profileData.companyName && (profileData.sector || profileData.marketCap)) {
+        console.log(`✅ Successfully fetched profile for ${upperTicker} with ${Object.keys(data).join(', ')}`);
+        return {
+          success: true,
+          data: profileData,
+          source: 'rapidapi'
         };
-
-        if (profileData.companyName || profileData.sector || profileData.marketCap) {
-          return {
-            success: true,
-            data: profileData,
-            source: data.source || 'api'
-          };
-        }
-      } catch (endpointError) {
-        lastError = endpointError;
-        const message = endpointError?.response?.data?.message || endpointError?.message || endpointError;
-        console.warn(`⚠️ Failed to fetch company profile for ${upperTicker}: ${message}`);
-        continue;
       }
-    }
 
-    if (lastError) {
-      console.warn(`⚠️ Company profile lookup fallback for ${upperTicker}: ${lastError?.message || lastError}`);
-    }
+      throw new Error('Insufficient data in API response');
 
-    return {
-      success: true,
-      data: this.getMockCompanyProfile(upperTicker),
-      source: 'mock_fallback'
-    };
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || error;
+      console.warn(`⚠️ Failed to fetch company profile for ${upperTicker}: ${message}`);
+      console.log(`🔄 Using mock data as fallback for ${upperTicker}`);
+      
+      return {
+        success: true,
+        data: this.getMockCompanyProfile(upperTicker),
+        source: 'mock_fallback'
+      };
+    }
   }
 
   /**

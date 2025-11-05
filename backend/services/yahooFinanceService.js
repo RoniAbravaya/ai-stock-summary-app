@@ -647,13 +647,14 @@ class YahooFinanceService {
 
     } catch (error) {
       const message = error?.response?.data?.message || error?.message || error;
-      console.warn(`⚠️ Failed to fetch company profile for ${upperTicker}: ${message}`);
-      console.log(`🔄 Using mock data as fallback for ${upperTicker}`);
+      console.error(`❌ Failed to fetch company profile for ${upperTicker}: ${message}`);
       
+      // Return error instead of mock data
+      // This way we can see what's actually failing
       return {
-        success: true,
-        data: this.getMockCompanyProfile(upperTicker),
-        source: 'mock_fallback'
+        success: false,
+        error: `Failed to fetch profile: ${message}`,
+        ticker: upperTicker
       };
     }
   }
@@ -724,23 +725,25 @@ class YahooFinanceService {
    * @returns {Object} Mock company profile data
    */
   getMockCompanyProfile(ticker) {
+    // Return minimal mock data - only what's absolutely necessary
+    // Most fields should be null to show "N/A" in the UI
     return {
       symbol: ticker,
       companyName: this.getStockName(ticker),
-      sector: 'Technology',
-      industry: 'Software—Infrastructure',
-      country: 'United States',
-      website: `https://${this.getCompanyDomain(ticker)}`,
-      longBusinessSummary: 'Mock company profile for development purposes.',
-      exchange: 'NASDAQ',
-      exchangeTimezone: 'America/New_York',
-      marketCap: 1230000000000,
-      marketCapFormatted: '$1.23T',
-      fiftyTwoWeekHigh: 200,
-      fiftyTwoWeekLow: 120,
-      employees: 100000,
-      city: 'San Francisco',
-      state: 'CA',
+      sector: null,
+      industry: null,
+      country: null,
+      website: null,
+      longBusinessSummary: null, // Don't show mock business summary
+      exchange: null,
+      exchangeTimezone: null,
+      marketCap: null,
+      marketCapFormatted: null,
+      fiftyTwoWeekHigh: null,
+      fiftyTwoWeekLow: null,
+      employees: null,
+      city: null,
+      state: null,
       fetchedAt: new Date().toISOString()
     };
   }

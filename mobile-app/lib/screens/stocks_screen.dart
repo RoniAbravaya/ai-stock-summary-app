@@ -693,9 +693,8 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
           const SizedBox(height: 16),
           _buildChartCard(theme, stock),
           _buildBriefInfoSection(theme, stock),
-          _buildSummaryCard(theme, stock),
-          const SizedBox(height: 16),
-          _buildActionsRow(stock.symbol),
+          // Removed: AI Summary Card
+          // Removed: Actions Row (Share button)
         ],
       ),
     );
@@ -1034,54 +1033,8 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
     );
   }
 
-  Widget _buildSummaryCard(ThemeData theme, Stock stock) {
-    final isDark = theme.brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey.shade900 : theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('AI Summary', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Text(
-            'An AI-generated summary for ${stock.symbol} will appear here, highlighting key trends, recent news, and potential risks.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionsRow(String symbol) {
-    return Row(
-      children: [
-        OutlinedButton.icon(
-          onPressed: () => _shareSymbol(symbol),
-          icon: const Icon(Icons.ios_share),
-          label: const Text('Share'),
-        ),
-        const SizedBox(width: 12),
-        OutlinedButton.icon(
-          onPressed: () => _openInBrowser(symbol),
-          icon: const Icon(Icons.open_in_new),
-          label: const Text('Open'),
-        ),
-      ],
-    );
-  }
+  // Removed: AI Summary Card - not needed on stock details page
+  // Removed: Actions Row with Share button - not needed on stock details page
 }
 
 Future<void> _shareSymbol(String symbol) async {

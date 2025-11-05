@@ -51,7 +51,12 @@ class StockBriefInfoCard extends StatelessWidget {
       ),
     ];
 
-    final hasDescription = (profile.longBusinessSummary ?? '').trim().isNotEmpty;
+    // Only show description if it's real data (not mock/placeholder text)
+    final summary = (profile.longBusinessSummary ?? '').trim();
+    final isMockData = summary.toLowerCase().contains('mock') || 
+                       summary.toLowerCase().contains('development purposes') ||
+                       summary.isEmpty;
+    final hasDescription = !isMockData && summary.isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(

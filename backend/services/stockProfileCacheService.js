@@ -69,22 +69,27 @@ class StockProfileCacheService {
       const apiResult = await yahooFinanceService.getCompanyProfile(upperTicker);
 
       if (!apiResult.success) {
-        // If API fails and we have stale cache, return it
+        console.error(`❌ API failed for ${upperTicker}: ${apiResult.error}`);
+        
+        // If API fails and we have stale cache, return it (better than nothing)
         if (doc.exists) {
           const staleData = doc.data();
-          console.log(`⚠️ API failed, using stale cache for ${upperTicker}`);
+          const age = Math.round((Date.now() - staleData.cachedAt) / 1000 / 60 / 60); // hours
+          console.log(`⚠️ API failed, using stale cache for ${upperTicker} (${age}h old)`);
           return {
             success: true,
             data: staleData.profile,
             source: 'stale_firestore_cache',
             ticker: upperTicker,
-            warning: 'Using expired cache due to API failure'
+            warning: `Using ${age}h old cache due to API failure`
           };
         }
 
+        // No cache available, return error
+        console.log(`❌ No cache available for ${upperTicker}, returning error`);
         return {
           success: false,
-          error: apiResult.error || 'Failed to fetch profile',
+          error: apiResult.error || 'Failed to fetch profile and no cache available',
           ticker: upperTicker
         };
       }

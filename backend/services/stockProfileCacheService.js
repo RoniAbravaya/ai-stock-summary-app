@@ -6,6 +6,7 @@
 
 const firebaseService = require('./firebaseService');
 const yahooFinanceService = require('./yahooFinanceService');
+const admin = require('firebase-admin');
 
 class StockProfileCacheService {
   constructor() {
@@ -94,7 +95,7 @@ class StockProfileCacheService {
         profile: apiResult.data,
         cachedAt: Date.now(),
         source: apiResult.source,
-        updatedAt: firebaseService.FieldValue.serverTimestamp()
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
       await docRef.set(cacheData, { merge: true });
@@ -155,7 +156,7 @@ class StockProfileCacheService {
         profile: apiResult.data,
         cachedAt: Date.now(),
         source: apiResult.source,
-        updatedAt: firebaseService.FieldValue.serverTimestamp()
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
       await this.collection.doc(upperTicker).set(cacheData, { merge: true });

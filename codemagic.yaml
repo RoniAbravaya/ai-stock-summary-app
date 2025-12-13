@@ -64,7 +64,7 @@ workflows:
         # Make sure App Store Connect integration is properly configured
       vars:
         BUNDLE_ID: com.marketmindai
-        # APP_STORE_APP_ID: "1234567890"  # Add this after creating app in App Store Connect
+        APP_STORE_APP_ID: "6756526355"  # Add this after creating app in App Store Connect
       <<: *env_versions
     
     triggering:

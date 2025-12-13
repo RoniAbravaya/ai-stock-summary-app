@@ -90,7 +90,13 @@ workflows:
       - name: Get Flutter packages
         script: |
           cd mobile-app
-          flutter packages pub get
+          flutter pub get
+      
+      - name: Prepare iOS build
+        script: |
+          cd mobile-app
+          flutter precache --ios
+          flutter build ios --config-only --release --no-codesign
       
       - name: Set up Firebase configuration (if using secrets)
         script: |
@@ -180,7 +186,13 @@ workflows:
       - name: Get Flutter packages
         script: |
           cd mobile-app
-          flutter packages pub get
+          flutter pub get
+      
+      - name: Prepare iOS build
+        script: |
+          cd mobile-app
+          flutter precache --ios
+          flutter build ios --config-only --debug --no-codesign
       
       - *flutter_analyze
       

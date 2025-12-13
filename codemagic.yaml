@@ -63,7 +63,7 @@ workflows:
       vars:
         # Override with actual values in Codemagic UI
         BUNDLE_ID: com.ai_stock_summary
-        APP_STORE_APP_ID: "HRKRYSS4N3"  # Set this in Codemagic UI
+        # APP_STORE_APP_ID: "1234567890"  # Add this after creating app in App Store Connect
       <<: *env_versions
     
     triggering:

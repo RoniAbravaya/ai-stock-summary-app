@@ -973,7 +973,7 @@ class FirebaseService {
     }
 
     final OAuthCredential credential = FacebookAuthProvider.credential(
-      accessToken.token,
+      accessToken.tokenString,
     );
 
     return await auth.signInWithCredential(credential);
@@ -1122,13 +1122,12 @@ class FirebaseService {
           throw Exception('Failed to get Facebook access token');
         }
         print('✅ Access token received');
-        print('🔑 Token: ${accessToken.token.substring(0, 20)}...');
-        print('👤 User ID: ${accessToken.userId}');
+        print('🔑 Token: ${accessToken.tokenString.substring(0, 20)}...');
 
         // Create a credential from the access token
         print('🔄 Step 4: Creating Firebase credential from Facebook token...');
         final OAuthCredential credential = FacebookAuthProvider.credential(
-          accessToken.token,
+          accessToken.tokenString,
         );
         print('✅ Firebase credential created');
 

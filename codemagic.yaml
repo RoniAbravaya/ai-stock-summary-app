@@ -60,9 +60,10 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.marketmindai
+        # Codemagic will automatically create certificates and profiles if they don't exist
+        # Make sure App Store Connect integration is properly configured
       vars:
-        # Override with actual values in Codemagic UI
-        BUNDLE_ID: com.ai_stock_summary
+        BUNDLE_ID: com.marketmindai
         # APP_STORE_APP_ID: "1234567890"  # Add this after creating app in App Store Connect
       <<: *env_versions
     

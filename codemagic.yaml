@@ -1,0 +1,270 @@
+# Codemagic CI/CD configuration for AI Stock Summary (MarketMind AI)
+# This workflow builds and deploys the Flutter iOS app to App Store Connect
+#
+# Prerequisites:
+# 1. Add your app to Codemagic and connect your repository
+# 2. Configure code signing in Codemagic UI (App Store Connect API key)
+# 3. Set up environment variables in Codemagic UI (see definitions section below)
+
+definitions:
+  # Environment variables that need to be set in Codemagic UI:
+  # - APP_STORE_CONNECT_ISSUER_ID: Your App Store Connect API Issuer ID
+  # - APP_STORE_CONNECT_KEY_IDENTIFIER: Your App Store Connect API Key ID  
+  # - APP_STORE_CONNECT_PRIVATE_KEY: Your App Store Connect API private key (.p8 file contents)
+  # - CERTIFICATE_PRIVATE_KEY: Your iOS distribution certificate private key
+  # - BUNDLE_ID: com.ai_stock_summary (or your actual bundle ID)
+  # - APP_STORE_APP_ID: Your App Store app ID (numeric, found in App Store Connect)
+  #
+  # For Firebase (if using GoogleService-Info.plist from secrets):
+  # - GOOGLE_SERVICE_INFO_PLIST: Base64 encoded GoogleService-Info.plist
+  
+  env_versions: &env_versions
+    flutter: stable
+    xcode: latest
+    cocoapods: default
+
+  scripts:
+    - &install_pods
+      name: Install CocoaPods dependencies
+      script: |
+        cd mobile-app/ios
+        pod install --repo-update
+    
+    - &flutter_analyze
+      name: Run Flutter analyze
+      script: |
+        cd mobile-app
+        flutter analyze --no-fatal-infos
+      ignore_failure: true
+    
+    - &flutter_test
+      name: Run Flutter tests  
+      script: |
+        cd mobile-app
+        flutter test
+      ignore_failure: true
+
+workflows:
+  # ============================================================================
+  # iOS App Store Release Workflow
+  # ============================================================================
+  ios-release:
+    name: iOS App Store Release
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    
+    integrations:
+      app_store_connect: Codemagic  # Name of the integration in Codemagic UI
+    
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.marketmindai
+      vars:
+        # Override with actual values in Codemagic UI
+        BUNDLE_ID: com.ai_stock_summary
+        APP_STORE_APP_ID: "HRKRYSS4N3"  # Set this in Codemagic UI
+      <<: *env_versions
+    
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+        - pattern: release/*
+          include: true
+          source: true
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+    
+    scripts:
+      - name: Set up local properties
+        script: |
+          echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/mobile-app/android/local.properties"
+      
+      - name: Get Flutter packages
+        script: |
+          cd mobile-app
+          flutter packages pub get
+      
+      - name: Set up Firebase configuration (if using secrets)
+        script: |
+          # Uncomment if storing GoogleService-Info.plist as base64 secret
+          # echo $GOOGLE_SERVICE_INFO_PLIST | base64 --decode > mobile-app/ios/Runner/GoogleService-Info.plist
+          echo "Firebase configuration check..."
+          if [ -f "mobile-app/ios/Runner/GoogleService-Info.plist" ]; then
+            echo "GoogleService-Info.plist exists"
+          else
+            echo "Warning: GoogleService-Info.plist not found - make sure it's in the repository or set as secret"
+          fi
+      
+      - *install_pods
+      
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles --project=mobile-app/ios/Runner.xcodeproj
+      
+      - name: Increment build number
+        script: |
+          cd mobile-app
+          # Use Codemagic build number for unique builds
+          LATEST_BUILD_NUMBER=$PROJECT_BUILD_NUMBER
+          agvtool new-version -all $((LATEST_BUILD_NUMBER + 1))
+        working_directory: mobile-app/ios
+      
+      - name: Build iOS IPA
+        script: |
+          cd mobile-app
+          flutter build ipa \
+            --release \
+            --export-options-plist=/Users/builder/export_options.plist
+    
+    artifacts:
+      - mobile-app/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - mobile-app/flutter_drive.log
+    
+    publishing:
+      email:
+        recipients:
+          - erolrony91@gmail.com  # Update with your email
+        notify:
+          success: true
+          failure: true
+      
+      app_store_connect:
+        auth: integration
+        # Submit to App Store Connect for TestFlight and/or App Store review
+        submit_to_testflight: true
+        submit_to_app_store: false  # Set to true when ready for production release
+        
+        # Optional: Expire previous TestFlight builds
+        expire_build_submitted_for_review: true
+        
+        # Beta group for TestFlight (create in App Store Connect first)
+        beta_groups:
+          - Internal Testers
+        
+        # Optional: Submit for review automatically
+        # submit_to_app_store: true
+        # cancel_previous_submissions: true
+
+  # ============================================================================
+  # iOS Development/Testing Workflow (No publishing)
+  # ============================================================================
+  ios-development:
+    name: iOS Development Build
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    
+    environment:
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.marketmindai
+      <<: *env_versions
+    
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: '*'
+          include: true
+          source: true
+    
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          cd mobile-app
+          flutter packages pub get
+      
+      - *flutter_analyze
+      
+      - *flutter_test
+      
+      - *install_pods
+      
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles --project=mobile-app/ios/Runner.xcodeproj
+      
+      - name: Build iOS app (Debug)
+        script: |
+          cd mobile-app
+          flutter build ios --debug --no-codesign
+    
+    artifacts:
+      - mobile-app/build/ios/iphoneos/*.app
+      - /tmp/xcodebuild_logs/*.log
+    
+    publishing:
+      email:
+        recipients:
+          - erolrony91@gmail.com
+        notify:
+          success: false
+          failure: true
+
+  # ============================================================================
+  # Android Release Workflow (Bonus - for Play Store if needed)
+  # ============================================================================
+  android-release:
+    name: Android Play Store Release
+    max_build_duration: 90
+    instance_type: linux_x2
+    
+    environment:
+      android_signing:
+        - ai_stock_keystore  # Configure keystore in Codemagic UI
+      groups:
+        - google_play  # Environment group with GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+      <<: *env_versions
+    
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+    
+    scripts:
+      - name: Set up local properties
+        script: |
+          echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/mobile-app/android/local.properties"
+      
+      - name: Get Flutter packages
+        script: |
+          cd mobile-app
+          flutter packages pub get
+      
+      - *flutter_analyze
+      
+      - name: Build Android App Bundle
+        script: |
+          cd mobile-app
+          flutter build appbundle --release
+    
+    artifacts:
+      - mobile-app/build/app/outputs/bundle/release/*.aab
+      - mobile-app/build/app/outputs/flutter-apk/*.apk
+    
+    publishing:
+      email:
+        recipients:
+          - erolrony91@gmail.com
+        notify:
+          success: true
+          failure: true
+      
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal  # Options: internal, alpha, beta, production
+        submit_as_draft: true

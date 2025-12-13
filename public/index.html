@@ -1,87 +1,1216 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome to Firebase Hosting</title>
-
-    <!-- update the version number as needed -->
+    <title>Erol Roni Abravaya | Integration Engineer & Full-Stack Developer</title>
+    <meta name="description" content="Integration Engineer & Full-Stack Developer with 5+ years of experience in e-commerce, fintech, and SaaS platforms. Creator of MarketMind AI and Jumpy Ball.">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs -->
     <script defer src="/__/firebase/11.8.1/firebase-app-compat.js"></script>
-    <!-- include only the Firebase features as you need -->
-    <script defer src="/__/firebase/11.8.1/firebase-auth-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-database-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-firestore-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-functions-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-messaging-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-storage-compat.js"></script>
     <script defer src="/__/firebase/11.8.1/firebase-analytics-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-remote-config-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-performance-compat.js"></script>
-    <!-- 
-      initialize the SDK after all desired features are loaded, set useEmulator to false
-      to avoid connecting the SDK to running emulators.
-    -->
     <script defer src="/__/firebase/init.js?useEmulator=true"></script>
 
-    <style media="screen">
-      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
-      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px; border-radius: 3px; }
-      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
-      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
-      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
-      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
-      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
-      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
+    <style>
+      :root {
+        --color-bg: #0a0a0f;
+        --color-bg-elevated: #12121a;
+        --color-bg-card: #1a1a24;
+        --color-primary: #6366f1;
+        --color-primary-light: #818cf8;
+        --color-accent: #f59e0b;
+        --color-accent-light: #fbbf24;
+        --color-text: #f8fafc;
+        --color-text-muted: #94a3b8;
+        --color-border: #2d2d3a;
+        --gradient-hero: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f59e0b 100%);
+        --gradient-card: linear-gradient(145deg, rgba(99, 102, 241, 0.1), rgba(245, 158, 11, 0.05));
+        --font-heading: 'Playfair Display', Georgia, serif;
+        --font-body: 'Source Sans 3', system-ui, sans-serif;
+        --shadow-glow: 0 0 60px rgba(99, 102, 241, 0.3);
+        --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        font-family: var(--font-body);
+        background: var(--color-bg);
+        color: var(--color-text);
+        line-height: 1.7;
+        overflow-x: hidden;
+      }
+
+      /* Animated Background */
+      .bg-pattern {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: -1;
+        background: 
+          radial-gradient(ellipse 80% 50% at 20% -20%, rgba(99, 102, 241, 0.15), transparent),
+          radial-gradient(ellipse 60% 40% at 80% 100%, rgba(245, 158, 11, 0.1), transparent),
+          radial-gradient(ellipse 40% 60% at 50% 50%, rgba(118, 75, 162, 0.05), transparent);
+      }
+
+      .bg-pattern::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%236366f1' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        opacity: 0.5;
+      }
+
+      /* Navigation */
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        padding: 1rem 2rem;
+        background: rgba(10, 10, 15, 0.8);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--color-border);
+        transition: all 0.3s ease;
+      }
+
+      nav .nav-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      nav .logo {
+        font-family: var(--font-heading);
+        font-size: 1.5rem;
+        font-weight: 700;
+        background: var(--gradient-hero);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      nav .nav-links {
+        display: flex;
+        gap: 2rem;
+        list-style: none;
+      }
+
+      nav .nav-links a {
+        color: var(--color-text-muted);
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.3s ease;
+        position: relative;
+      }
+
+      nav .nav-links a::after {
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 0;
+        width: 0;
+        height: 2px;
+        background: var(--gradient-hero);
+        transition: width 0.3s ease;
+      }
+
+      nav .nav-links a:hover {
+        color: var(--color-text);
+      }
+
+      nav .nav-links a:hover::after {
+        width: 100%;
+      }
+
+      /* Hero Section */
+      .hero {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6rem 2rem 4rem;
+        position: relative;
+      }
+
+      .hero-content {
+        max-width: 1200px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4rem;
+        align-items: center;
+      }
+
+      .hero-text h1 {
+        font-family: var(--font-heading);
+        font-size: clamp(2.5rem, 5vw, 4rem);
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 1.5rem;
+      }
+
+      .hero-text h1 .highlight {
+        background: var(--gradient-hero);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .hero-text .tagline {
+        font-size: 1.25rem;
+        color: var(--color-text-muted);
+        margin-bottom: 2rem;
+        max-width: 500px;
+      }
+
+      .hero-text .cta-buttons {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.875rem 1.75rem;
+        border-radius: 50px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        font-size: 1rem;
+      }
+
+      .btn-primary {
+        background: var(--gradient-hero);
+        color: white;
+        box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(99, 102, 241, 0.5);
+      }
+
+      .btn-secondary {
+        background: var(--color-bg-card);
+        color: var(--color-text);
+        border: 1px solid var(--color-border);
+      }
+
+      .btn-secondary:hover {
+        background: var(--color-bg-elevated);
+        border-color: var(--color-primary);
+      }
+
+      .hero-image {
+        position: relative;
+        display: flex;
+        justify-content: center;
+      }
+
+      .profile-wrapper {
+        position: relative;
+      }
+
+      .profile-wrapper::before {
+        content: '';
+        position: absolute;
+        inset: -20px;
+        background: var(--gradient-hero);
+        border-radius: 50%;
+        opacity: 0.3;
+        filter: blur(40px);
+        animation: pulse 4s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 0.3; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(1.05); }
+      }
+
+      .profile-img {
+        width: 320px;
+        height: 320px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 4px solid var(--color-border);
+        position: relative;
+        z-index: 1;
+        background: var(--color-bg-card);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      }
+
+      .floating-badge {
+        position: absolute;
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        padding: 0.75rem 1.25rem;
+        border-radius: 50px;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        box-shadow: var(--shadow-card);
+        animation: float 3s ease-in-out infinite;
+      }
+
+      .floating-badge.badge-1 {
+        top: 10%;
+        right: -10%;
+        animation-delay: 0s;
+      }
+
+      .floating-badge.badge-2 {
+        bottom: 20%;
+        left: -15%;
+        animation-delay: 1s;
+      }
+
+      .floating-badge.badge-3 {
+        bottom: 5%;
+        right: 0;
+        animation-delay: 2s;
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+
+      /* Section Styles */
+      section {
+        padding: 6rem 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .section-header {
+        text-align: center;
+        margin-bottom: 4rem;
+      }
+
+      .section-header h2 {
+        font-family: var(--font-heading);
+        font-size: clamp(2rem, 4vw, 3rem);
+        margin-bottom: 1rem;
+      }
+
+      .section-header p {
+        color: var(--color-text-muted);
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      /* Featured Project */
+      .project-showcase {
+        background: var(--gradient-card);
+        border: 1px solid var(--color-border);
+        border-radius: 24px;
+        padding: 3rem;
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 3rem;
+        align-items: center;
+        box-shadow: var(--shadow-card);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .project-showcase::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.1), transparent);
+        pointer-events: none;
+      }
+
+      .project-mockup {
+        position: relative;
+        display: flex;
+        justify-content: center;
+      }
+
+      .phone-frame {
+        background: linear-gradient(145deg, #1a1a24, #0a0a0f);
+        border-radius: 40px;
+        padding: 12px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        position: relative;
+      }
+
+      .phone-screen {
+        width: 240px;
+        height: 500px;
+        background: linear-gradient(180deg, #1e3a5f 0%, #0f1c2e 100%);
+        border-radius: 32px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .phone-header {
+        padding: 1.5rem 1rem 1rem;
+        text-align: center;
+      }
+
+      .phone-header .app-name {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: white;
+      }
+
+      .phone-header .app-subtitle {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 0.25rem;
+      }
+
+      .stock-cards {
+        padding: 0.5rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .stock-card {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 0.75rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .stock-card .ticker {
+        font-weight: 600;
+        color: white;
+      }
+
+      .stock-card .change {
+        font-size: 0.85rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 6px;
+      }
+
+      .stock-card .change.up {
+        background: rgba(16, 185, 129, 0.2);
+        color: #10b981;
+      }
+
+      .stock-card .change.down {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
+
+      .project-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .app-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        object-fit: cover;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      .project-info h3 {
+        font-family: var(--font-heading);
+        font-size: 2rem;
+        margin: 0;
+      }
+
+      .project-info .project-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--color-accent);
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .project-info p {
+        color: var(--color-text-muted);
+        margin-bottom: 1.5rem;
+        line-height: 1.8;
+      }
+
+      .feature-list {
+        list-style: none;
+        margin-bottom: 2rem;
+      }
+
+      .feature-list li {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        color: var(--color-text-muted);
+      }
+
+      .feature-list li::before {
+        content: '✓';
+        color: var(--color-primary);
+        font-weight: bold;
+      }
+
+      .tech-stack {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+      }
+
+      .tech-tag {
+        background: var(--color-bg-elevated);
+        border: 1px solid var(--color-border);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        color: var(--color-text-muted);
+      }
+
+      .project-links {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      /* Secondary Project Showcase (same layout as featured) */
+      .project-showcase-secondary {
+        background: var(--gradient-card);
+        border: 1px solid var(--color-border);
+        border-radius: 24px;
+        padding: 3rem;
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 3rem;
+        align-items: center;
+        box-shadow: var(--shadow-card);
+        position: relative;
+        overflow: hidden;
+        margin-top: 3rem;
+      }
+
+      .project-showcase-secondary::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.1), transparent);
+        pointer-events: none;
+      }
+
+      .project-showcase-secondary .project-mockup {
+        position: relative;
+        display: flex;
+        justify-content: center;
+      }
+
+      .project-showcase-secondary .phone-frame {
+        background: linear-gradient(145deg, #1a1a24, #0a0a0f);
+        border-radius: 36px;
+        padding: 10px;
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+      }
+
+      .project-showcase-secondary .phone-screen {
+        width: 200px;
+        height: 420px;
+        border-radius: 28px;
+        overflow: hidden;
+        background: #000;
+      }
+
+      .project-showcase-secondary .phone-screen img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .project-showcase-secondary .project-info .project-badge {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+      }
+
+      @media (max-width: 900px) {
+        .project-showcase-secondary {
+          grid-template-columns: 1fr;
+          padding: 2rem;
+        }
+
+        .project-showcase-secondary .project-mockup {
+          order: -1;
+        }
+
+        .project-showcase-secondary .phone-screen {
+          width: 180px;
+          height: 380px;
+        }
+      }
+
+      /* About Section */
+      .about-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+        align-items: start;
+      }
+
+      .about-text h3 {
+        font-family: var(--font-heading);
+        font-size: 1.75rem;
+        margin-bottom: 1rem;
+      }
+
+      .about-text p {
+        color: var(--color-text-muted);
+        margin-bottom: 1.5rem;
+        line-height: 1.8;
+      }
+
+      .experience-list {
+        list-style: none;
+      }
+
+      .experience-item {
+        position: relative;
+        padding-left: 1.5rem;
+        padding-bottom: 1.5rem;
+        border-left: 2px solid var(--color-border);
+      }
+
+      .experience-item:last-child {
+        padding-bottom: 0;
+      }
+
+      .experience-item::before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        top: 0;
+        width: 10px;
+        height: 10px;
+        background: var(--color-primary);
+        border-radius: 50%;
+      }
+
+      .experience-item .company {
+        font-weight: 600;
+        color: var(--color-text);
+      }
+
+      .experience-item .role {
+        color: var(--color-primary-light);
+        font-size: 0.9rem;
+      }
+
+      .experience-item .period {
+        color: var(--color-text-muted);
+        font-size: 0.85rem;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+      }
+
+      .stat-card {
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
+      }
+
+      .stat-card .number {
+        font-family: var(--font-heading);
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: var(--gradient-hero);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .stat-card .label {
+        color: var(--color-text-muted);
+        font-size: 0.9rem;
+        margin-top: 0.25rem;
+      }
+
+      @media (max-width: 900px) {
+        .about-content {
+          grid-template-columns: 1fr;
+        }
+
+        .stats-grid {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
+
       @media (max-width: 600px) {
-        body, #message { margin-top: 0; background: white; box-shadow: none; }
-        body { border-top: 16px solid #ffa100; }
+        .stats-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      /* Skills Section */
+      .skills-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .skill-card {
+        background: var(--gradient-card);
+        border: 1px solid var(--color-border);
+        border-radius: 16px;
+        padding: 2rem;
+        transition: all 0.3s ease;
+      }
+
+      .skill-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-glow);
+        border-color: var(--color-primary);
+      }
+
+      .skill-card .icon {
+        width: 50px;
+        height: 50px;
+        background: var(--gradient-hero);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1.25rem;
+      }
+
+      .skill-card h3 {
+        font-size: 1.25rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .skill-card p {
+        color: var(--color-text-muted);
+        font-size: 0.95rem;
+      }
+
+      /* Contact Section */
+      .contact-section {
+        text-align: center;
+        background: var(--gradient-card);
+        border: 1px solid var(--color-border);
+        border-radius: 24px;
+        padding: 4rem;
+        margin-bottom: 4rem;
+      }
+
+      .contact-section h2 {
+        font-family: var(--font-heading);
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .contact-section p {
+        color: var(--color-text-muted);
+        margin-bottom: 2rem;
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .social-links {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .social-link {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1rem 1.5rem;
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: 50px;
+        color: var(--color-text);
+        text-decoration: none;
+        transition: all 0.3s ease;
+      }
+
+      .social-link:hover {
+        border-color: var(--color-primary);
+        background: var(--color-bg-elevated);
+        transform: translateY(-2px);
+      }
+
+      .social-link svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      /* Footer */
+      footer {
+        text-align: center;
+        padding: 2rem;
+        color: var(--color-text-muted);
+        font-size: 0.9rem;
+        border-top: 1px solid var(--color-border);
+      }
+
+      /* Responsive */
+      @media (max-width: 900px) {
+        .hero-content {
+          grid-template-columns: 1fr;
+          text-align: center;
+        }
+
+        .hero-text .cta-buttons {
+          justify-content: center;
+        }
+
+        .hero-text .tagline {
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .hero-image {
+          order: -1;
+        }
+
+        .profile-img {
+          width: 250px;
+          height: 250px;
+        }
+
+        .floating-badge {
+          display: none;
+        }
+
+        .project-showcase {
+          grid-template-columns: 1fr;
+          padding: 2rem;
+        }
+
+        .project-mockup {
+          order: -1;
+        }
+
+        nav .nav-links {
+          display: none;
+        }
+      }
+
+      @media (max-width: 600px) {
+        section {
+          padding: 4rem 1.5rem;
+        }
+
+        .contact-section {
+          padding: 2.5rem 1.5rem;
+        }
       }
     </style>
   </head>
   <body>
-    <div id="message">
-      <h2>Welcome</h2>
-      <h1>Firebase Hosting Setup Complete</h1>
-      <p>You're seeing this because you've successfully setup Firebase Hosting. Now it's time to go build something extraordinary!</p>
-      <a target="_blank" href="https://firebase.google.com/docs/hosting/">Open Hosting Documentation</a>
+    <div class="bg-pattern"></div>  
+
+    <!-- Navigation -->
+    <nav>
+      <div class="nav-content">
+        <div class="logo">Erol Roni Abravaya</div>
+        <ul class="nav-links">
+          <li><a href="#home">Home</a></li>
+          <li><a href="#about">About</a></li>
+          <li><a href="#projects">Projects</a></li>
+          <li><a href="#skills">Skills</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+      <div class="hero-content">
+        <div class="hero-text">
+          <h1>
+            Hi, I'm <span class="highlight">Erol Roni Abravaya</span>
+          </h1>
+          <p class="tagline">
+            Integration Engineer & Full-Stack Developer with 5+ years of experience in e-commerce, fintech, and SaaS platforms. 
+            I build intelligent applications and troubleshoot complex systems across global environments.
+          </p>
+          <div class="cta-buttons">
+            <a href="#project" class="btn btn-primary">
+              <span>View My Work</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </a>
+            <a href="#contact" class="btn btn-secondary">Get In Touch</a>
+          </div>
+        </div>
+        <div class="hero-image">
+          <div class="profile-wrapper">
+            <img src="1517039728692.jpeg" alt="Erol Roni Abravaya" class="profile-img">
+            <div class="floating-badge badge-1">
+              <span>🚀</span> Flutter Developer
+            </div>
+            <div class="floating-badge badge-2">
+              <span>⚡</span> Node.js
+            </div>
+            <div class="floating-badge badge-3">
+              <span>🔥</span> Firebase
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about">
+      <div class="section-header">
+        <h2>About Me</h2>
+        <p>Bridging technical expertise with business needs</p>
+      </div>
+
+      <div class="about-content">
+        <div class="about-text">
+          <h3>Technical Support & Integration Engineer</h3>
+          <p>
+            I'm a Technical Support Engineer with 5+ years of experience in e-commerce, fintech, and SaaS platforms. 
+            Skilled at troubleshooting complex system, API, and integration issues across global merchant environments.
+          </p>
+          <p>
+            I collaborate with DevOps, engineering, and product teams to drive issue resolution, improve platform stability, 
+            and deliver exceptional experiences. My technical foundation spans SQL, REST APIs, scripting (Python/Bash/JavaScript), 
+            and system administration across Windows, Mac, and Linux.
+          </p>
+
+          <ul class="experience-list">
+            <li class="experience-item">
+              <span class="company">Global-e</span>
+              <span class="role">Technical Support Engineer</span>
+              <span class="period">2024 - Present</span>
+            </li>
+            <li class="experience-item">
+              <span class="company">PayU</span>
+              <span class="role">Technical Support Engineer</span>
+              <span class="period">2022 - 2024</span>
+            </li>
+
+          </ul>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="number">5+</div>
+            <div class="label">Years Experience</div>
+          </div>
+          <div class="stat-card">
+            <div class="number">2</div>
+            <div class="label">Published Apps</div>
+          </div>
+          <div class="stat-card">
+            <div class="number">3</div>
+            <div class="label">Industries</div>
+          </div>
+          <div class="stat-card">
+            <div class="number">∞</div>
+            <div class="label">Bugs Squashed</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects">
+      <div class="section-header">
+        <h2>My Projects</h2>
+        <p>A showcase of my work combining AI, finance, and mobile development</p>
+      </div>
+
+      <div class="project-showcase">
+        <div class="project-mockup">
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <div class="phone-header">
+                <div class="app-name">MarketMind AI</div>
+                <div class="app-subtitle">Your Intelligent Stock Companion</div>
+              </div>
+              <div class="stock-cards">
+                <div class="stock-card">
+                  <span class="ticker">AAPL</span>
+                  <span class="change up">+2.45%</span>
+                </div>
+                <div class="stock-card">
+                  <span class="ticker">GOOGL</span>
+                  <span class="change up">+1.87%</span>
+                </div>
+                <div class="stock-card">
+                  <span class="ticker">TSLA</span>
+                  <span class="change down">-0.92%</span>
+                </div>
+                <div class="stock-card">
+                  <span class="ticker">MSFT</span>
+                  <span class="change up">+3.21%</span>
+                </div>
+                <div class="stock-card">
+                  <span class="ticker">NVDA</span>
+                  <span class="change up">+4.56%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="project-info">
+          <div class="project-header">
+            <img src="unnamed.webp" alt="MarketMind AI Icon" class="app-icon">
+            <h3>MarketMind AI</h3>
+          </div>
+          <div class="project-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.6 11.48c-.17-.67-.49-1.29-.92-1.83l1.63-1.63a8.468 8.468 0 011.63 2.93l-2.34.53zM6.4 11.48l-2.34-.53c.28-.96.76-1.84 1.41-2.59l1.66 1.66c-.41.5-.71 1.07-.93 1.71l.2-.25zm9.2 1.02c0 1.99-1.61 3.6-3.6 3.6S8.4 14.49 8.4 12.5s1.61-3.6 3.6-3.6 3.6 1.61 3.6 3.6zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+            </svg>
+            <span>Live on Google Play</span>
+          </div>
+          <p>
+            MarketMind AI is your intelligent companion for the stock market. 
+            Stay ahead with AI-powered summaries, trending stocks, real-time data, 
+            and a personalized watchlist — all in one sleek mobile app.
+          </p>
+
+          <ul class="feature-list">
+            <li>AI-Powered Summaries — Instantly understand stock news</li>
+            <li>Trending Stocks — Track the hottest market movers</li>
+            <li>Real-Time Data — Live price updates and charts</li>
+            <li>Personalized Watchlist — Save and follow your favorites</li>
+            <li>Push Notifications — Never miss important updates</li>
+          </ul>
+
+          <div class="tech-stack">
+            <span class="tech-tag">Flutter</span>
+            <span class="tech-tag">Node.js</span>
+            <span class="tech-tag">Firebase</span>
+            <span class="tech-tag">OpenAI GPT</span>
+            <span class="tech-tag">Cloud Functions</span>
+            <span class="tech-tag">FCM</span>
+          </div>
+
+          <div class="project-links">
+            <a href="https://play.google.com/store/apps/details?id=com.ai_stock_summary" target="_blank" class="btn btn-primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3.609 1.814L13.792 12 3.609 22.186c-.181-.085-.339-.188-.463-.309-.248-.247-.396-.58-.396-.877V3c0-.597.361-1.129.859-1.186zM14.854 13.061l2.559 1.491-3.022 1.762-1.538-1.539 2.001-1.714zm3.61 2.101l2.721 1.586-2.721 1.586-2.16-1.261 2.16-1.911zm-3.61-5.324l1.538-1.539 3.022 1.762-2.559 1.491-2.001-1.714zM5.205.396L14.792 10.5l-3.085 2.645L4.341 5.777c-.116-.109-.222-.229-.31-.357A1.618 1.618 0 013.75 4.5V3c0-.276.068-.545.195-.789L5.205.396z"/>
+              </svg>
+              <span>Download App</span>
+            </a>
+            <a href="https://github.com/RoniAbravaya/ai-stock-summary-app" target="_blank" class="btn btn-secondary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
+              <span>View Source</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Jumpy Ball Project -->
+      <div class="project-showcase-secondary">
+        <div class="project-mockup">
+          <div class="phone-frame">
+            <div class="phone-screen">
+              <img src="jumpy ball app image.webp" alt="Jumpy Ball Screenshot">
+            </div>
+          </div>
+        </div>
+
+        <div class="project-info">
+          <div class="project-header">
+            <img src="jmupyball icon.webp" alt="Jumpy Ball Icon" class="app-icon">
+            <h3>Jumpy Ball</h3>
+          </div>
+          <div class="project-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.6 11.48c-.17-.67-.49-1.29-.92-1.83l1.63-1.63a8.468 8.468 0 011.63 2.93l-2.34.53zM6.4 11.48l-2.34-.53c.28-.96.76-1.84 1.41-2.59l1.66 1.66c-.41.5-.71 1.07-.93 1.71l.2-.25zm9.2 1.02c0 1.99-1.61 3.6-3.6 3.6S8.4 14.49 8.4 12.5s1.61-3.6 3.6-3.6 3.6 1.61 3.6 3.6zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+            </svg>
+            <span>Live on Google Play</span>
+          </div>
+          <p>
+            Dive into adventure and try to go as far as you can! A fun, addictive mobile game 
+            that tests your reflexes and timing skills. Simple controls, endless fun.
+          </p>
+
+          <ul class="feature-list">
+            <li>Simple one-tap gameplay</li>
+            <li>Endless adventure mode</li>
+            <li>Challenge your reflexes</li>
+            <li>Compete for high scores</li>
+          </ul>
+
+          <div class="tech-stack">
+            <span class="tech-tag">Mobile Game</span>
+            <span class="tech-tag">Adventure</span>
+            <span class="tech-tag">Casual</span>
+          </div>
+
+          <div class="project-links">
+            <a href="https://play.google.com/store/apps/details?id=com.roni.jumpyball" target="_blank" class="btn btn-primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3.609 1.814L13.792 12 3.609 22.186c-.181-.085-.339-.188-.463-.309-.248-.247-.396-.58-.396-.877V3c0-.597.361-1.129.859-1.186zM14.854 13.061l2.559 1.491-3.022 1.762-1.538-1.539 2.001-1.714zm3.61 2.101l2.721 1.586-2.721 1.586-2.16-1.261 2.16-1.911zm-3.61-5.324l1.538-1.539 3.022 1.762-2.559 1.491-2.001-1.714zM5.205.396L14.792 10.5l-3.085 2.645L4.341 5.777c-.116-.109-.222-.229-.31-.357A1.618 1.618 0 013.75 4.5V3c0-.276.068-.545.195-.789L5.205.396z"/>
+              </svg>
+              <span>Download Game</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Skills Section -->
+    <section id="skills">
+      <div class="section-header">
+        <h2>What I Do</h2>
+        <p>Building full-stack solutions from concept to deployment</p>
+      </div>
+
+      <div class="skills-grid">
+        <div class="skill-card">
+          <div class="icon">🔗</div>
+          <h3>API & Integrations</h3>
+          <p>Expert in REST APIs, JSON/XML, and troubleshooting complex integration issues using Postman and log analysis.</p>
+        </div>
+        <div class="skill-card">
+          <div class="icon">📱</div>
+          <h3>Mobile Development</h3>
+          <p>Cross-platform apps with Flutter, delivering native performance on iOS and Android with a single codebase.</p>
+        </div>
+        <div class="skill-card">
+          <div class="icon">⚙️</div>
+          <h3>Backend & Scripting</h3>
+          <p>Node.js APIs, Python automation, Bash scripting, and SQL queries for data analysis and system administration.</p>
+        </div>
+        <div class="skill-card">
+          <div class="icon">🔥</div>
+          <h3>Cloud & DevOps</h3>
+          <p>Firebase ecosystem, CI/CD collaboration, SaaS troubleshooting, and cross-platform system administration.</p>
+        </div>
+        <div class="skill-card">
+          <div class="icon">🤖</div>
+          <h3>AI Integration</h3>
+          <p>Implementing OpenAI GPT models to power intelligent features like automated summaries and natural language processing.</p>
+        </div>
+        <div class="skill-card">
+          <div class="icon">🛡️</div>
+          <h3>Technical Support</h3>
+          <p>Tier-2 support for global merchants, onboarding training, documentation, and cross-functional collaboration.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact">
+      <div class="contact-section">
+        <h2>Let's Connect</h2>
+        <p>Interested in working together or have a question? Feel free to reach out through any of these channels.</p>
+        
+        <div class="social-links">
+          <a href="https://www.linkedin.com/in/erol-roni-abravaya-061458102/" target="_blank" class="social-link">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+            </svg>
+            <span>LinkedIn</span>
+          </a>
+          <a href="https://github.com/RoniAbravaya" target="_blank" class="social-link">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+            <span>GitHub</span>
+          </a>
+          <a href="mailto:erolrony91@gmail.com" class="social-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            <span>Email</span>
+          </a>
+        </div>
     </div>
-    <p id="load">Firebase SDK Loading&hellip;</p>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p>© 2025 Erol Roni Abravaya. Crafted with passion in Israel.</p>
+    </footer>
 
     <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const loadEl = document.querySelector('#load');
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-        // // The Firebase SDK is initialized and available here!
-        //
-        // firebase.auth().onAuthStateChanged(user => { });
-        // firebase.database().ref('/path/to/ref').on('value', snapshot => { });
-        // firebase.firestore().doc('/foo/bar').get().then(() => { });
-        // firebase.functions().httpsCallable('yourFunction')().then(() => { });
-        // firebase.messaging().requestPermission().then(() => { });
-        // firebase.storage().ref('/path/to/ref').getDownloadURL().then(() => { });
-        // firebase.analytics(); // call to activate
-        // firebase.analytics().logEvent('tutorial_completed');
-        // firebase.performance(); // call to activate
-        //
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+      // Smooth scroll for navigation links
+      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+          e.preventDefault();
+          const target = document.querySelector(this.getAttribute('href'));
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      });
 
+      // Navbar background on scroll
+      window.addEventListener('scroll', () => {
+        const nav = document.querySelector('nav');
+        if (window.scrollY > 50) {
+          nav.style.background = 'rgba(10, 10, 15, 0.95)';
+        } else {
+          nav.style.background = 'rgba(10, 10, 15, 0.8)';
+        }
+      });
+
+      // Initialize Firebase if available
+      document.addEventListener('DOMContentLoaded', function() {
         try {
-          let app = firebase.app();
-          let features = [
-            'auth', 
-            'database', 
-            'firestore',
-            'functions',
-            'messaging', 
-            'storage', 
-            'analytics', 
-            'remoteConfig',
-            'performance',
-          ].filter(feature => typeof app[feature] === 'function');
-          loadEl.textContent = `Firebase SDK loaded with ${features.join(', ')}`;
+          if (typeof firebase !== 'undefined' && firebase.app) {
+            firebase.analytics();
+          }
         } catch (e) {
-          console.error(e);
-          loadEl.textContent = 'Error loading the Firebase SDK, check the console.';
+          console.log('Firebase analytics not available');
         }
       });
     </script>

@@ -971,8 +971,10 @@ class _StockDetailsScreenState extends State<StockDetailsScreen> {
           return _buildInfoLoadingCard(theme);
         }
 
+        // If API error (likely quota exceeded), hide the card instead of showing error
         if (snapshot.hasError && profile == null) {
-          return _buildInfoErrorCard(theme);
+          // Silently hide the company brief if API quota is exceeded
+          return const SizedBox.shrink();
         }
 
         if (profile == null) {

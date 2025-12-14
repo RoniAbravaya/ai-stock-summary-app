@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -26,13 +28,45 @@ import 'package:share_plus/share_plus.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await _initializeFirebaseForCurrentPlatform();
     print('📱 Background message received: ${message.messageId}');
   } catch (e) {
     print('⚠️ Background message handler error: $e');
   }
+}
+
+/// Initializes Firebase in a way that supports both common setups:
+/// - iOS/macOS via `ios/Runner/GoogleService-Info.plist`
+/// - Other platforms via FlutterFire `DefaultFirebaseOptions`
+///
+/// This avoids hard-failing iOS when `firebase_options.dart` is stale/invalid,
+/// while still supporting builds that use generated options.
+Future<void> _initializeFirebaseForCurrentPlatform() async {
+  // Prevent double-initialization (e.g., when background isolate starts).
+  if (Firebase.apps.isNotEmpty) return;
+
+  if (kIsWeb) {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    return;
+  }
+
+  final platform = defaultTargetPlatform;
+  final bool isApple = platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
+
+  if (isApple) {
+    // Preferred on Apple: initialize from bundled plist if present.
+    try {
+      await Firebase.initializeApp();
+      return;
+    } catch (_) {
+      // Fall back to generated options (useful if the project is configured
+      // purely via FlutterFire CLI without bundling a plist).
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      return;
+    }
+  }
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
 void main() async {
@@ -47,9 +81,7 @@ void main() async {
 
   try {
     // Initialize Firebase
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await _initializeFirebaseForCurrentPlatform();
     print('✅ Firebase initialized successfully');
     firebaseInitialized = true;
 
@@ -67,6 +99,13 @@ void main() async {
     await FirebaseService().initialize();
   } catch (e) {
     print('⚠️ Firebase initialization failed: $e');
+    if (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      print(
+        'ℹ️ If you are running on iOS/macOS, ensure the Firebase config file exists at '
+        '`mobile-app/ios/Runner/GoogleService-Info.plist` and is added to the Runner target.',
+      );
+    }
     print('🔄 Running app without Firebase features...');
     firebaseInitialized = false;
   }

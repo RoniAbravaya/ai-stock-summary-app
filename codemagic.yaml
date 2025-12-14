@@ -108,15 +108,27 @@ workflows:
           flutter precache --ios
           flutter build ios --config-only --release --no-codesign
       
-      - name: Set up Firebase configuration (if using secrets)
+      - name: Set up Firebase configuration
         script: |
-          # Uncomment if storing GoogleService-Info.plist as base64 secret
+          # If using base64 secret for GoogleService-Info.plist (uncomment if needed):
           # echo $GOOGLE_SERVICE_INFO_PLIST | base64 --decode > mobile-app/ios/Runner/GoogleService-Info.plist
-          echo "Firebase configuration check..."
-          if [ -f "mobile-app/ios/Runner/GoogleService-Info.plist" ]; then
-            echo "GoogleService-Info.plist exists"
+          
+          echo "🔥 Firebase configuration check..."
+          PLIST_PATH="mobile-app/ios/Runner/GoogleService-Info.plist"
+          
+          if [ -f "$PLIST_PATH" ]; then
+            echo "✅ GoogleService-Info.plist exists at $PLIST_PATH"
+            # Verify the plist is valid and has required keys
+            if grep -q "GOOGLE_APP_ID" "$PLIST_PATH" && grep -q "GCM_SENDER_ID" "$PLIST_PATH"; then
+              echo "✅ GoogleService-Info.plist contains required Firebase keys"
+            else
+              echo "❌ ERROR: GoogleService-Info.plist is missing required Firebase keys"
+              exit 1
+            fi
           else
-            echo "Warning: GoogleService-Info.plist not found - make sure it's in the repository or set as secret"
+            echo "❌ ERROR: GoogleService-Info.plist not found at $PLIST_PATH"
+            echo "The file must be committed to the repository or provided via CI secrets."
+            exit 1
           fi
       
       - *install_pods

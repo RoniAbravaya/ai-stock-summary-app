@@ -45,23 +45,27 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 ///
 /// Strategy:
 /// 1. Check if Firebase is already initialized (prevents double-init errors)
-/// 2. For Apple platforms (iOS/macOS): Try plist-based init first, then fallback to options
-/// 3. For other platforms: Use DefaultFirebaseOptions.currentPlatform
+/// 2. On iOS/macOS: AppDelegate.swift calls FirebaseApp.configure() before Flutter starts,
+///    so we just call Firebase.initializeApp() to sync the Dart side with native.
+/// 3. On Android and other platforms: Use DefaultFirebaseOptions.currentPlatform
 ///
-/// The dual-init approach for Apple platforms handles both scenarios:
-/// - Native plist configuration (preferred, set up via Xcode)
-/// - FlutterFire CLI generated options (fallback)
+/// Note: The [I-COR000003] error "The default Firebase app has not yet been configured"
+/// is a WARNING that appears before AppDelegate runs - it can be safely ignored if
+/// Firebase initializes successfully afterward.
 Future<void> _initializeFirebaseForCurrentPlatform() async {
   // Prevent double-initialization (background isolates, hot reload, etc.)
   if (Firebase.apps.isNotEmpty) {
     if (kDebugMode) {
-      print('🔄 Firebase already initialized, skipping...');
+      print('🔄 Firebase already initialized (${Firebase.apps.length} app(s)), skipping...');
     }
     return;
   }
 
   if (kIsWeb) {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    if (kDebugMode) {
+      print('✅ Firebase initialized for Web');
+    }
     return;
   }
 
@@ -69,38 +73,26 @@ Future<void> _initializeFirebaseForCurrentPlatform() async {
   final bool isApple = platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
 
   if (isApple) {
-    // Apple platforms: Try native plist first, then fallback to Dart options.
-    // This supports both Xcode-configured projects and FlutterFire CLI projects.
+    // On iOS/macOS, AppDelegate.swift should have already called FirebaseApp.configure()
+    // We call Firebase.initializeApp() WITHOUT options to sync with the native configuration.
+    // If that fails, we fall back to Dart-based options.
     try {
-      // First attempt: Initialize from bundled GoogleService-Info.plist
-      // This relies on AppDelegate.swift having already called FirebaseApp.configure()
-      // or the plist being properly bundled in the app.
       await Firebase.initializeApp();
       if (kDebugMode) {
-        print('✅ Firebase initialized from native plist configuration');
+        print('✅ Firebase initialized on iOS (synced with native AppDelegate)');
       }
       return;
-    } catch (plistError) {
+    } catch (e) {
       if (kDebugMode) {
-        print('ℹ️ Plist-based init failed, trying Dart options: $plistError');
+        print('⚠️ Native Firebase sync failed: $e');
+        print('   Attempting fallback with Dart options...');
       }
-      // Fallback: Use Dart-based options from firebase_options.dart
-      try {
-        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-        if (kDebugMode) {
-          print('✅ Firebase initialized from Dart options (fallback)');
-        }
-        return;
-      } catch (optionsError) {
-        // Both methods failed - provide detailed diagnostics
-        if (kDebugMode) {
-          print('❌ Both Firebase init methods failed on ${platform.name}');
-          print('   Plist error: $plistError');
-          print('   Options error: $optionsError');
-        }
-        // Rethrow the options error as it's more likely to have actionable info
-        rethrow;
+      // Fallback to Dart options if native sync fails
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      if (kDebugMode) {
+        print('✅ Firebase initialized on iOS (Dart options fallback)');
       }
+      return;
     }
   }
 

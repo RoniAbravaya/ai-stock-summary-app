@@ -4,9 +4,8 @@ import FirebaseCore
 
 /// AppDelegate for the Flutter app.
 /// 
-/// Note: Firebase is configured in FirebaseLoader.m using +load method,
-/// which runs before main() and before this AppDelegate is instantiated.
-/// This ensures Firebase is ready before any Flutter plugins try to access it.
+/// Firebase configuration is handled by FirebaseLoader.m's +load method which runs
+/// before main(). This AppDelegate serves as a fallback if that fails.
 @main
 @objc class AppDelegate: FlutterAppDelegate {
   
@@ -14,14 +13,18 @@ import FirebaseCore
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    // Firebase should already be configured by FirebaseLoader.m's +load method.
-    // Log the status for debugging.
-    if let app = FirebaseApp.app() {
-      NSLog("✅ [AppDelegate] Firebase is configured: \(app.options.projectID ?? "?")")
+    // Check Firebase status - it should already be configured by FirebaseLoader.m
+    if FirebaseApp.app() != nil {
+      NSLog("✅ [AppDelegate] Firebase already configured")
     } else {
-      // This shouldn't happen if FirebaseLoader.m is working correctly
-      NSLog("⚠️ [AppDelegate] Firebase not configured, attempting to configure now...")
+      // Fallback: configure Firebase here if +load didn't work
+      NSLog("⚠️ [AppDelegate] Firebase not configured, configuring now...")
       FirebaseApp.configure()
+      if FirebaseApp.app() != nil {
+        NSLog("✅ [AppDelegate] Firebase configured successfully")
+      } else {
+        NSLog("❌ [AppDelegate] Firebase configuration failed")
+      }
     }
     
     // Register Flutter plugins

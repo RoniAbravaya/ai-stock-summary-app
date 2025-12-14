@@ -24,10 +24,18 @@ definitions:
     cocoapods: default
 
   scripts:
+    - &clean_ios
+      name: Clean Flutter + CocoaPods (iOS)
+      script: |
+        cd mobile-app
+        flutter clean
+        rm -rf ios/Pods ios/Podfile.lock
+
     - &install_pods
       name: Install CocoaPods dependencies
       script: |
         cd mobile-app/ios
+        rm -rf Pods Podfile.lock
         pod install --repo-update
     
     - &flutter_analyze
@@ -86,6 +94,8 @@ workflows:
       - name: Set up local properties
         script: |
           echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/mobile-app/android/local.properties"
+
+      - *clean_ios
       
       - name: Get Flutter packages
         script: |
@@ -183,6 +193,8 @@ workflows:
           source: true
     
     scripts:
+      - *clean_ios
+
       - name: Get Flutter packages
         script: |
           cd mobile-app

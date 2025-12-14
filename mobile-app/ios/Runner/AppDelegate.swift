@@ -2,74 +2,67 @@ import Flutter
 import UIKit
 import FirebaseCore
 
+/// Ensures Firebase is configured at the earliest possible point in the app lifecycle.
+/// This helper class uses a static initializer to configure Firebase before any
+/// other code runs, including Flutter plugins that might access Firebase.
+private class FirebaseInitializer {
+  static let shared = FirebaseInitializer()
+  
+  private init() {
+    // This runs when the class is first accessed (which happens at static init time)
+    configureFirebase()
+  }
+  
+  func ensureInitialized() {
+    // No-op, just ensures the singleton is created and Firebase is configured
+  }
+  
+  private func configureFirebase() {
+    // Check if already configured
+    if FirebaseApp.app() != nil {
+      NSLog("ℹ️ [FirebaseInitializer] Firebase already configured")
+      return
+    }
+    
+    // Check if GoogleService-Info.plist exists
+    guard let plistPath = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") else {
+      NSLog("❌ [FirebaseInitializer] GoogleService-Info.plist NOT FOUND!")
+      return
+    }
+    
+    NSLog("🔥 [FirebaseInitializer] Configuring Firebase...")
+    NSLog("   Plist path: \(plistPath)")
+    
+    // Configure Firebase
+    FirebaseApp.configure()
+    
+    if let app = FirebaseApp.app() {
+      NSLog("✅ [FirebaseInitializer] Firebase configured: project=\(app.options.projectID ?? "?")")
+    } else {
+      NSLog("❌ [FirebaseInitializer] Firebase.configure() failed!")
+    }
+  }
+}
+
+// Force Firebase initialization at app launch by accessing the singleton
+// This happens during static initialization, before main() runs
+private let _ = FirebaseInitializer.shared
+
 @main
 @objc class AppDelegate: FlutterAppDelegate {
   
-  // Configure Firebase as early as possible - in init() before any other code runs
   override init() {
+    // Ensure Firebase is configured before calling super.init()
+    FirebaseInitializer.shared.ensureInitialized()
     super.init()
-    
-    // This runs before didFinishLaunchingWithOptions and before plugins load
-    Self.configureFirebaseOnce()
-  }
-  
-  // Static method to ensure Firebase is configured exactly once
-  private static var firebaseConfigured = false
-  
-  private static func configureFirebaseOnce() {
-    guard !firebaseConfigured else {
-      NSLog("ℹ️ Firebase already configured (skipping)")
-      return
-    }
-    
-    NSLog("🔥 Configuring Firebase in AppDelegate.init()...")
-    
-    // Check if GoogleService-Info.plist exists in bundle
-    if let plistPath = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") {
-      NSLog("✅ GoogleService-Info.plist found at: \(plistPath)")
-      
-      // Verify we can read the plist
-      if let plistData = NSDictionary(contentsOfFile: plistPath) {
-        if let projectId = plistData["PROJECT_ID"] as? String {
-          NSLog("   Project ID: \(projectId)")
-        }
-        if let appId = plistData["GOOGLE_APP_ID"] as? String {
-          NSLog("   App ID: \(appId)")
-        }
-        if let bundleId = plistData["BUNDLE_ID"] as? String,
-           let appBundleId = Bundle.main.bundleIdentifier {
-          if bundleId != appBundleId {
-            NSLog("⚠️ Bundle ID mismatch! Plist: \(bundleId), App: \(appBundleId)")
-          }
-        }
-      }
-    } else {
-      NSLog("❌ GoogleService-Info.plist NOT FOUND in bundle!")
-      return
-    }
-    
-    // Configure Firebase
-    if FirebaseApp.app() == nil {
-      FirebaseApp.configure()
-      firebaseConfigured = true
-      
-      if let app = FirebaseApp.app() {
-        NSLog("✅ Firebase configured successfully: \(app.options.projectID ?? "unknown")")
-      } else {
-        NSLog("❌ Firebase.configure() called but FirebaseApp.app() is nil!")
-      }
-    } else {
-      firebaseConfigured = true
-      NSLog("ℹ️ Firebase was already configured by another component")
-    }
   }
   
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    // Ensure Firebase is configured (should already be done in init, but just in case)
-    Self.configureFirebaseOnce()
+    // Double-check Firebase is configured (should be done by now)
+    FirebaseInitializer.shared.ensureInitialized()
     
     // Register Flutter plugins AFTER Firebase is configured
     GeneratedPluginRegistrant.register(with: self)

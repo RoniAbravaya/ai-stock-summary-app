@@ -1,11 +1,7 @@
 /// FirebaseLoader.m
 ///
-/// Configures Firebase at the earliest possible point to prevent
-/// "[FirebaseCore][I-COR000003] The default Firebase app has not yet been configured"
-///
-/// The +load method runs when the class is loaded into memory, before main().
-/// We call [FIRApp configure] IMMEDIATELY to minimize race conditions with
-/// other Firebase plugin +load methods that might check Firebase status.
+/// Configures Firebase at the earliest possible point in the app lifecycle.
+/// Uses Objective-C +load method which runs before main().
 
 #import <Foundation/Foundation.h>
 
@@ -17,6 +13,7 @@
 #define FIREBASE_AVAILABLE 1
 #else
 #define FIREBASE_AVAILABLE 0
+#warning "Firebase headers not found"
 #endif
 
 @interface FirebaseLoader : NSObject
@@ -25,24 +22,38 @@
 @implementation FirebaseLoader
 
 + (void)load {
+    NSLog(@"🔥 [FirebaseLoader +load] Starting...");
+    
 #if FIREBASE_AVAILABLE
-    // Configure Firebase IMMEDIATELY - no logging first!
-    // This minimizes the race window with other +load methods
-    @try {
-        if ([FIRApp defaultApp] == nil) {
-            [FIRApp configure];
-        }
-    } @catch (NSException *e) {
-        // Silently ignore - will be handled by AppDelegate fallback
+    // Check if already configured (by another component)
+    if ([FIRApp defaultApp] != nil) {
+        NSLog(@"ℹ️ [FirebaseLoader +load] Firebase already configured");
+        return;
     }
     
-    // Log AFTER configuration is complete
-    if ([FIRApp defaultApp] != nil) {
-        NSLog(@"✅ [FirebaseLoader] Firebase configured: %@", 
-              [FIRApp defaultApp].options.projectID);
-    } else {
-        NSLog(@"⚠️ [FirebaseLoader] Firebase not configured in +load");
+    // Check for GoogleService-Info.plist
+    NSString *plistPath = [[NSBundle mainBundle] pathForResource:@"GoogleService-Info" ofType:@"plist"];
+    if (plistPath == nil) {
+        NSLog(@"❌ [FirebaseLoader +load] GoogleService-Info.plist NOT FOUND");
+        return;
     }
+    NSLog(@"✅ [FirebaseLoader +load] GoogleService-Info.plist found");
+    
+    // Configure Firebase
+    @try {
+        [FIRApp configure];
+        
+        if ([FIRApp defaultApp] != nil) {
+            NSLog(@"✅ [FirebaseLoader +load] Firebase configured: %@", 
+                  [FIRApp defaultApp].options.projectID);
+        } else {
+            NSLog(@"❌ [FirebaseLoader +load] Firebase configuration failed");
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"❌ [FirebaseLoader +load] Exception: %@", exception);
+    }
+#else
+    NSLog(@"❌ [FirebaseLoader +load] Firebase headers not available");
 #endif
 }
 

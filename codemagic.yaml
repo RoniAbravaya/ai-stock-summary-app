@@ -24,6 +24,15 @@ definitions:
     cocoapods: default
 
   scripts:
+    - &validate_firebase_config
+      name: Validate Firebase configuration
+      script: |
+        cd mobile-app
+        chmod +x scripts/validate_firebase_config.sh
+        ./scripts/validate_firebase_config.sh ios
+      # Fail fast if Firebase config is missing/invalid
+      ignore_failure: false
+
     - &clean_ios
       name: Clean Flutter + CocoaPods (iOS)
       script: |
@@ -95,6 +104,8 @@ workflows:
         script: |
           echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/mobile-app/android/local.properties"
 
+      - *validate_firebase_config
+
       - *clean_ios
       
       - name: Get Flutter packages
@@ -112,12 +123,7 @@ workflows:
         script: |
           # Uncomment if storing GoogleService-Info.plist as base64 secret
           # echo $GOOGLE_SERVICE_INFO_PLIST | base64 --decode > mobile-app/ios/Runner/GoogleService-Info.plist
-          echo "Firebase configuration check..."
-          if [ -f "mobile-app/ios/Runner/GoogleService-Info.plist" ]; then
-            echo "GoogleService-Info.plist exists"
-          else
-            echo "Warning: GoogleService-Info.plist not found - make sure it's in the repository or set as secret"
-          fi
+          echo "Firebase configuration already validated in previous step"
       
       - *install_pods
       
@@ -193,6 +199,8 @@ workflows:
           source: true
     
     scripts:
+      - *validate_firebase_config
+
       - *clean_ios
 
       - name: Get Flutter packages

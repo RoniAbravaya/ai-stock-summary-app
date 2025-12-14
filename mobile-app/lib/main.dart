@@ -41,65 +41,27 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 }
 
-/// Initializes Firebase using a unified approach for all platforms.
+/// Initializes Firebase for the current platform.
 ///
-/// Strategy:
-/// 1. Check if Firebase is already initialized (prevents double-init errors)
-/// 2. On iOS/macOS: AppDelegate.swift calls FirebaseApp.configure() before Flutter starts,
-///    so we just call Firebase.initializeApp() to sync the Dart side with native.
-/// 3. On Android and other platforms: Use DefaultFirebaseOptions.currentPlatform
-///
-/// Note: The [I-COR000003] error "The default Firebase app has not yet been configured"
-/// is a WARNING that appears before AppDelegate runs - it can be safely ignored if
-/// Firebase initializes successfully afterward.
+/// On iOS, AppDelegate.swift configures Firebase natively before Flutter starts.
+/// The Dart call to Firebase.initializeApp() syncs with that native configuration.
+/// On Android, we use DefaultFirebaseOptions from firebase_options.dart.
 Future<void> _initializeFirebaseForCurrentPlatform() async {
   // Prevent double-initialization (background isolates, hot reload, etc.)
   if (Firebase.apps.isNotEmpty) {
     if (kDebugMode) {
-      print('🔄 Firebase already initialized (${Firebase.apps.length} app(s)), skipping...');
+      print('🔄 Firebase already initialized, skipping...');
     }
     return;
   }
 
-  if (kIsWeb) {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    if (kDebugMode) {
-      print('✅ Firebase initialized for Web');
-    }
-    return;
-  }
-
-  final platform = defaultTargetPlatform;
-  final bool isApple = platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
-
-  if (isApple) {
-    // On iOS/macOS, AppDelegate.swift should have already called FirebaseApp.configure()
-    // We call Firebase.initializeApp() WITHOUT options to sync with the native configuration.
-    // If that fails, we fall back to Dart-based options.
-    try {
-      await Firebase.initializeApp();
-      if (kDebugMode) {
-        print('✅ Firebase initialized on iOS (synced with native AppDelegate)');
-      }
-      return;
-    } catch (e) {
-      if (kDebugMode) {
-        print('⚠️ Native Firebase sync failed: $e');
-        print('   Attempting fallback with Dart options...');
-      }
-      // Fallback to Dart options if native sync fails
-      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-      if (kDebugMode) {
-        print('✅ Firebase initialized on iOS (Dart options fallback)');
-      }
-      return;
-    }
-  }
-
-  // Android, Windows, Linux: Use Dart-based options
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Use platform-specific options from firebase_options.dart
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
   if (kDebugMode) {
-    print('✅ Firebase initialized from Dart options');
+    print('✅ Firebase initialized for ${defaultTargetPlatform.name}');
   }
 }
 

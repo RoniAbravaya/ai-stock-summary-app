@@ -43,22 +43,28 @@ class AppConfig {
   static const String facebookAppId = 'your-facebook-app-id';
 
   // AdMob Configuration
-  static const String admobAppIdAndroid = 'ca-app-pub-your-app-id~android';
-  static const String admobAppIdIOS = 'ca-app-pub-your-app-id~ios';
-  static const String admobBannerUnitIdAndroid =
-      'ca-app-pub-your-banner-unit-id/android';
-  static const String admobBannerUnitIdIOS =
-      'ca-app-pub-your-banner-unit-id/ios';
-  static const String admobRewardedUnitIdAndroid =
-      'ca-app-pub-your-rewarded-unit-id/android';
-  static const String admobRewardedUnitIdIOS =
-      'ca-app-pub-your-rewarded-unit-id/ios';
+  // NOTE: Replace these with your production AdMob IDs before release
+  // Test App IDs (Google's official test IDs - safe for development)
+  static const String admobAppIdAndroid = 'ca-app-pub-3940256099942544~3347511713';
+  static const String admobAppIdIOS = 'ca-app-pub-3940256099942544~1458002511';
+  
+  // Test Ad Unit IDs (Google's official test IDs)
+  static const String testBannerAdUnitIdAndroid = 'ca-app-pub-3940256099942544/6300978111';
+  static const String testBannerAdUnitIdIOS = 'ca-app-pub-3940256099942544/2934735716';
+  static const String testInterstitialAdUnitIdAndroid = 'ca-app-pub-3940256099942544/1033173712';
+  static const String testInterstitialAdUnitIdIOS = 'ca-app-pub-3940256099942544/4411468910';
+  static const String testRewardedAdUnitIdAndroid = 'ca-app-pub-3940256099942544/5224354917';
+  static const String testRewardedAdUnitIdIOS = 'ca-app-pub-3940256099942544/1712485313';
+  
+  // Production Ad Unit IDs (to be filled with real IDs)
+  static const String admobBannerUnitIdAndroid = 'ca-app-pub-your-banner-unit-id/android';
+  static const String admobBannerUnitIdIOS = 'ca-app-pub-your-banner-unit-id/ios';
+  static const String admobRewardedUnitIdAndroid = 'ca-app-pub-your-rewarded-unit-id/android';
+  static const String admobRewardedUnitIdIOS = 'ca-app-pub-your-rewarded-unit-id/ios';
 
-  // Test AdMob IDs (for development)
-  static const String testBannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111';
-  static const String testRewardedAdUnitId =
-      'ca-app-pub-3940256099942544/5224354917';
+  // Legacy test IDs for backward compatibility
+  static const String testBannerAdUnitId = testBannerAdUnitIdAndroid;
+  static const String testRewardedAdUnitId = testRewardedAdUnitIdAndroid;
 
   // App Limits & Features
   static const int freeSummariesPerMonth = 10;
@@ -160,21 +166,32 @@ class AppConfig {
     }
   }
 
-  // Get appropriate AdMob IDs
-  static String getBannerAdUnitId() {
+  // Get appropriate AdMob IDs based on platform and environment
+  static String getBannerAdUnitId({required bool isIOS}) {
+    // Always use test IDs in development/local environments
     if (isDevelopment || isLocal) {
-      return testBannerAdUnitId;
+      return isIOS ? testBannerAdUnitIdIOS : testBannerAdUnitIdAndroid;
     }
-    // Return platform-specific ID based on Platform.isAndroid/Platform.isIOS
-    return admobBannerUnitIdAndroid; // Placeholder - implement platform check
+    // Production IDs (replace with real IDs before release)
+    return isIOS ? admobBannerUnitIdIOS : admobBannerUnitIdAndroid;
   }
 
-  static String getRewardedAdUnitId() {
+  static String getRewardedAdUnitId({required bool isIOS}) {
+    // Always use test IDs in development/local environments
     if (isDevelopment || isLocal) {
-      return testRewardedAdUnitId;
+      return isIOS ? testRewardedAdUnitIdIOS : testRewardedAdUnitIdAndroid;
     }
-    // Return platform-specific ID based on Platform.isAndroid/Platform.isIOS
-    return admobRewardedUnitIdAndroid; // Placeholder - implement platform check
+    // Production IDs (replace with real IDs before release)
+    return isIOS ? admobRewardedUnitIdIOS : admobRewardedUnitIdAndroid;
+  }
+  
+  static String getInterstitialAdUnitId({required bool isIOS}) {
+    // Always use test IDs in development/local environments  
+    if (isDevelopment || isLocal) {
+      return isIOS ? testInterstitialAdUnitIdIOS : testInterstitialAdUnitIdAndroid;
+    }
+    // Production IDs (to be added)
+    return isIOS ? testInterstitialAdUnitIdIOS : testInterstitialAdUnitIdAndroid;
   }
 }
 

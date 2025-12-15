@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart'
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'firebase_options.dart';
 import 'services/firebase_service.dart';
 import 'services/firebase_diagnostics.dart';
@@ -114,6 +115,15 @@ void main() async {
     print('✅ Feature flags initialized (redesign=${FeatureFlagService().redesignEnabled})');
   } catch (e) {
     print('⚠️ Feature flags initialization failed: $e');
+  }
+
+  // Initialize Mobile Ads SDK
+  try {
+    await MobileAds.instance.initialize();
+    print('✅ Mobile Ads SDK initialized');
+  } catch (e) {
+    print('⚠️ Mobile Ads initialization failed: $e');
+    // Continue app execution - ads are not critical
   }
 
   runApp(AIStockSummaryApp(firebaseEnabled: firebaseInitialized));

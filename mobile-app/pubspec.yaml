@@ -51,6 +51,8 @@ dependencies:
   # Authentication
   google_sign_in: ^6.2.2
   flutter_facebook_auth: ^7.1.1
+  sign_in_with_apple: ^6.1.4
+  crypto: ^3.0.6
   # twitter_login: ^4.4.2  # Disabled - package has runtime compatibility issues with Android
   
   # HTTP & API Communication

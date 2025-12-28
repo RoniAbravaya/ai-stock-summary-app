@@ -649,6 +649,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _signInWithApple,
+                      icon: const Icon(Icons.apple),
+                      label: const Text('Sign in with Apple'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.black),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
                       onPressed: _isLoading ? null : _signInWithTwitter,
                       icon: const Icon(Icons.telegram),
                       label: const Text('Continue with Twitter'),
@@ -807,6 +818,26 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       if (widget.firebaseEnabled) {
         await FirebaseService().signInWithFacebook();
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar(e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    if (!mounted) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      if (widget.firebaseEnabled) {
+        await FirebaseService().signInWithApple();
       }
     } catch (e) {
       if (mounted) {

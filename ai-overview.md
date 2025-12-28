@@ -27,12 +27,26 @@
 - **Storage Bucket**: `new-flutter-ai.firebasestorage.app`
 
 ### Services Used
-- Firebase Authentication (with Google, Facebook, Twitter Sign-In)
+- Firebase Authentication (with Google, Facebook, Apple, Twitter Sign-In)
+  - **Sign in with Apple** (App Store Guideline 4.8 compliance): Required when using third-party logins. Provides a privacy-preserving login that limits data collection to name/email, allows users to hide their email, and doesn't collect data for advertising.
   - **Automatic Account Linking**: When "One account per email" is enabled, the app automatically links social sign-in providers if a user tries to sign in with a different provider for an existing email address
 - Cloud Firestore Database
 - Firebase Cloud Messaging (FCM)
 - Firebase Storage
 - Firebase Cloud Functions
+
+### Apple Sign-In Implementation (Guideline 4.8)
+**Files Modified:**
+- `mobile-app/pubspec.yaml` - Added `sign_in_with_apple: ^6.1.4` and `crypto: ^3.0.6`
+- `mobile-app/lib/services/firebase_service.dart` - `signInWithApple()` method
+- `mobile-app/lib/main.dart` - Apple Sign-In button in LoginScreen
+- `mobile-app/ios/Runner/Runner.entitlements` - Sign in with Apple capability
+- `mobile-app/ios/Runner.xcodeproj/project.pbxproj` - Entitlements reference
+
+**iOS Configuration Required:**
+1. Enable "Sign in with Apple" capability in Xcode (Signing & Capabilities)
+2. Ensure bundle ID matches App Store Connect
+3. The `Runner.entitlements` file contains `com.apple.developer.applesignin` entitlement
 
 ## Push Notification Architecture
 

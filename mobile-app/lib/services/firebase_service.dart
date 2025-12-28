@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -5,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 /// Firebase Service for Flutter
 /// Handles authentication, Firestore operations, and other Firebase services
@@ -787,8 +792,8 @@ class FirebaseService {
         // If we still have no methods, try all common providers
         if (methods.isEmpty && enumProtectionEnabled) {
           print('⚠️ No sign-in methods detected - will try all common providers');
-          print('   Strategy: Try Google → Facebook → Twitter in sequence');
-          methods = ['google.com', 'facebook.com', 'twitter.com'];
+          print('   Strategy: Try Google → Facebook → Apple → Twitter in sequence');
+          methods = ['google.com', 'facebook.com', 'apple.com', 'twitter.com'];
           print('');
         }
 
@@ -822,6 +827,10 @@ class FirebaseService {
               print('   📱 Launching Facebook sign-in flow...');
               existing = await _signInWithFacebookCredential();
               successfulMethod = 'Facebook';
+            } else if (method == 'apple.com') {
+              print('   📱 Launching Apple sign-in flow...');
+              existing = await _signInWithAppleCredential();
+              successfulMethod = 'Apple';
             } else if (method == 'twitter.com') {
               print('   📱 Launching Twitter sign-in flow...');
               existing = await _signInWithTwitterCredential();
@@ -1389,6 +1398,214 @@ class FirebaseService {
       
       rethrow;
     }
+  }
+
+  /// Sign in with Apple OAuth (App Store Guideline 4.8 compliance)
+  /// Required for App Store approval when using third-party logins like Google/Facebook.
+  /// Provides a privacy-preserving login option that:
+  /// - Limits data collection to name and email only
+  /// - Allows users to hide their email address
+  /// - Does not collect data for advertising purposes
+  Future<UserCredential> signInWithApple() async {
+    try {
+      print('🍎 ===== APPLE LOGIN STARTED =====');
+      print('🔄 Step 1: Initializing Apple Sign-In...');
+      print('🔍 Auth instance available: ${_auth != null}');
+      print('🔍 Current user before sign-in: ${_auth?.currentUser?.email ?? "null"}');
+
+      // Use the centralized sign-in or link function for automatic account linking
+      final userCredential = await _signInOrLink(() async {
+        // Generate a cryptographically secure nonce for security
+        print('🔄 Step 2: Generating secure nonce...');
+        final rawNonce = _generateNonce();
+        final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+        print('✅ Nonce generated successfully');
+
+        // Request Apple ID credentials with required scopes
+        print('🔄 Step 3: Requesting Apple ID credentials...');
+        print('📋 Scopes: [email, fullName]');
+        
+        final appleCredential = await SignInWithApple.getAppleIDCredential(
+          scopes: [
+            AppleIDAuthorizationScopes.email,
+            AppleIDAuthorizationScopes.fullName,
+          ],
+          nonce: hashedNonce,
+        );
+
+        print('✅ Apple ID credential received');
+        print('🔑 Identity token present: ${appleCredential.identityToken != null}');
+        print('📧 Email: ${appleCredential.email ?? "hidden by user"}');
+        print('👤 Full name: ${appleCredential.givenName ?? "not provided"} ${appleCredential.familyName ?? ""}');
+
+        // Check if we received an identity token
+        if (appleCredential.identityToken == null) {
+          print('❌ No identity token received from Apple');
+          throw Exception('Apple Sign-In failed: No identity token received');
+        }
+
+        // Create an OAuthCredential for Firebase using Apple's id token
+        print('🔄 Step 4: Creating Firebase OAuth credential...');
+        final oauthCredential = OAuthProvider('apple.com').credential(
+          idToken: appleCredential.identityToken,
+          rawNonce: rawNonce,
+        );
+        print('✅ Firebase OAuth credential created');
+
+        // Sign in to Firebase with the Apple credential
+        print('🔄 Step 5: Signing in to Firebase...');
+        final userCredential = await auth.signInWithCredential(oauthCredential);
+
+        // Update display name if provided by Apple (only on first sign-in)
+        if (appleCredential.givenName != null && userCredential.user != null) {
+          final displayName = '${appleCredential.givenName} ${appleCredential.familyName ?? ''}'.trim();
+          if (displayName.isNotEmpty) {
+            try {
+              await userCredential.user!.updateDisplayName(displayName);
+              print('✅ Display name updated to: $displayName');
+            } catch (e) {
+              print('⚠️ Failed to update display name: $e');
+            }
+          }
+        }
+
+        return userCredential;
+      }, 'Apple');
+
+      print('🎉 Step 6: Firebase sign-in completed!');
+      print('✅ Apple Sign-In successful!');
+      print('👤 User UID: ${userCredential.user?.uid}');
+      print('📧 User Email: ${userCredential.user?.email ?? "hidden"}');
+      print('📛 Display Name: ${userCredential.user?.displayName ?? "not set"}');
+
+      // Check Firestore connection and update/create user document
+      await _checkFirestoreConnection();
+
+      if (_isFirestoreAvailable && userCredential.user != null) {
+        try {
+          await _updateUserDocumentSafely(userCredential.user!);
+          
+          // Store any pending FCM token first
+          await _storePendingFCMToken();
+          
+          // Ensure FCM token exists and refresh if missing
+          final hasToken = await ensureFCMTokenExists();
+          if (!hasToken) {
+            print('⚠️ FCM token refresh failed during Apple sign-in');
+          }
+        } catch (firestoreError) {
+          print('⚠️ Firestore operations failed: $firestoreError');
+        }
+      }
+
+      // Setup admin user after successful authentication
+      await _setupAdminUserAfterAuth();
+
+      print('🍎 ===== APPLE LOGIN COMPLETED SUCCESSFULLY =====');
+      return userCredential;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      print('🍎 ===== APPLE LOGIN CANCELLED/ERROR =====');
+      print('❌ Apple authorization error: ${e.code}');
+      print('❌ Message: ${e.message}');
+      
+      if (e.code == AuthorizationErrorCode.canceled) {
+        throw Exception('Apple Sign-In was cancelled');
+      }
+      throw Exception('Apple Sign-In failed: ${e.message}');
+    } catch (e, stackTrace) {
+      print('🍎 ===== APPLE LOGIN ERROR =====');
+      print('❌ Error type: ${e.runtimeType}');
+      print('❌ Error message: $e');
+      print('📍 Error details: ${e.toString()}');
+
+      // Log specific Firebase Auth errors
+      if (e is FirebaseAuthException) {
+        print('🔥 FirebaseAuthException detected:');
+        print('   - Code: ${e.code}');
+        print('   - Message: ${e.message}');
+        print('   - Plugin: ${e.plugin}');
+      }
+
+      // Check if user cancelled
+      if (e.toString().toLowerCase().contains('cancel') ||
+          e.toString().toLowerCase().contains('abort')) {
+        print('👤 User cancelled the Apple login');
+      }
+
+      // Log stack trace for debugging
+      print('📚 Stack trace:');
+      print(stackTrace.toString().split('\n').take(10).join('\n'));
+
+      // Check if this is a known type casting error
+      if (e.toString().contains('List<Object?>') &&
+          e.toString().contains('PigeonUserDetails')) {
+        print('⚠️ Type casting issue detected - this is a known Firebase plugin bug');
+
+        if (_auth?.currentUser != null) {
+          print('✅ Authentication still successful despite type casting error');
+          print('👤 Authenticated user: ${_auth!.currentUser!.email}');
+
+          // Ensure user document is properly created/updated
+          if (_isFirestoreAvailable) {
+            try {
+              await _updateUserDocumentSafely(_auth!.currentUser!);
+              await _storePendingFCMToken();
+              final hasToken = await ensureFCMTokenExists();
+              if (!hasToken) {
+                print('⚠️ FCM token refresh failed after type cast error recovery');
+              }
+            } catch (docError) {
+              print('⚠️ User document update failed after type cast error: $docError');
+            }
+          }
+
+          // Setup admin user after successful authentication
+          await _setupAdminUserAfterAuth();
+
+          return Future.value(auth.currentUser as UserCredential);
+        }
+      }
+
+      print('🔄 Checking if user is actually signed in despite error...');
+      print('🔍 Current user after error: ${_auth?.currentUser?.email ?? "null"}');
+      print('🔍 Is user signed in: ${_auth?.currentUser != null}');
+      print('🍎 ===== RETHROWING ERROR =====');
+
+      rethrow;
+    }
+  }
+
+  /// Generates a cryptographically secure random nonce
+  /// Used for Apple Sign-In to prevent replay attacks
+  String _generateNonce([int length = 32]) {
+    const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
+  }
+
+  /// Internal method to get Apple credential and sign in (for account linking)
+  Future<UserCredential> _signInWithAppleCredential() async {
+    final rawNonce = _generateNonce();
+    final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+
+    final appleCredential = await SignInWithApple.getAppleIDCredential(
+      scopes: [
+        AppleIDAuthorizationScopes.email,
+        AppleIDAuthorizationScopes.fullName,
+      ],
+      nonce: hashedNonce,
+    );
+
+    if (appleCredential.identityToken == null) {
+      throw Exception('Apple Sign-In failed: No identity token received');
+    }
+
+    final oauthCredential = OAuthProvider('apple.com').credential(
+      idToken: appleCredential.identityToken,
+      rawNonce: rawNonce,
+    );
+
+    return await auth.signInWithCredential(oauthCredential);
   }
 
   /// Setup admin user after authentication

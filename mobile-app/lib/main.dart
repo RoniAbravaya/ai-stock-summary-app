@@ -648,18 +648,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     // Apple Sign-In - Required for App Store Guideline 4.8
-                    // Shows on iOS (native) and Android (via Firebase web OAuth)
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _signInWithApple,
-                      icon: const Icon(Icons.apple),
-                      label: const Text('Sign in with Apple'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        backgroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.black),
+                    // Only show on iOS devices (native Apple Sign-In)
+                    if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _signInWithApple,
+                        icon: const Icon(Icons.apple),
+                        label: const Text('Sign in with Apple'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          backgroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.black),
+                        ),
                       ),
-                    ),
+                    ],
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed: _isLoading ? null : _signInWithTwitter,

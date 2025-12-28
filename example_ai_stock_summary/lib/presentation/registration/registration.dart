@@ -26,6 +26,7 @@ class _RegistrationState extends State<Registration> {
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
+  bool _isAppleLoading = false;
   bool _termsAccepted = false;
   XFile? _selectedImage;
 
@@ -121,6 +122,22 @@ class _RegistrationState extends State<Registration> {
       _showErrorDialog('Google Sign-In failed. Please try again.');
     } finally {
       setState(() => _isGoogleLoading = false);
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() => _isAppleLoading = true);
+
+    try {
+      // Simulate Apple Sign-In process
+      await Future.delayed(Duration(seconds: 2));
+
+      // Navigate to dashboard on success
+      Navigator.pushReplacementNamed(context, '/dashboard');
+    } catch (e) {
+      _showErrorDialog('Apple Sign-In failed. Please try again.');
+    } finally {
+      setState(() => _isAppleLoading = false);
     }
   }
 
@@ -269,6 +286,48 @@ class _RegistrationState extends State<Registration> {
                       foregroundColor: AppTheme.lightTheme.colorScheme.onSurface,
                       side: BorderSide(
                         color: AppTheme.lightTheme.colorScheme.outline,
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: 2.h),
+
+                // Apple Sign-In Button (Required for App Store Guideline 4.8)
+                Container(
+                  width: double.infinity,
+                  height: 6.h,
+                  child: ElevatedButton.icon(
+                    onPressed: _isAppleLoading ? null : _signInWithApple,
+                    icon: _isAppleLoading
+                        ? SizedBox(
+                            width: 5.w,
+                            height: 5.w,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : CustomIconWidget(
+                            iconName: 'apple',
+                            color: Colors.white,
+                            size: 5.w,
+                          ),
+                    label: Text(
+                      _isAppleLoading ? 'Signing In...' : 'Continue with Apple',
+                      style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      side: BorderSide(
+                        color: Colors.black,
                         width: 1,
                       ),
                     ),

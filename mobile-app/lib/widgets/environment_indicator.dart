@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../config/app_config.dart';
 import '../screens/environment_settings_screen.dart';
 
 /// Environment Indicator Widget
 /// Shows the current environment status and allows quick access to environment settings
+/// IMPORTANT: This widget is automatically hidden in production/release builds
+/// per App Store Guideline 2.3.10 - metadata must not include development references
 class EnvironmentIndicator extends StatelessWidget {
   final bool showInProduction;
   final VoidCallback? onTap;
@@ -16,6 +19,12 @@ class EnvironmentIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // CRITICAL: Never show in release mode (App Store Guideline 2.3.10 compliance)
+    // This ensures development indicators never appear in App Store builds
+    if (kReleaseMode) {
+      return const SizedBox.shrink();
+    }
+    
     // Don't show in production unless explicitly requested
     if (AppConfig.isProduction && !showInProduction) {
       return const SizedBox.shrink();
@@ -140,6 +149,8 @@ class EnvironmentIndicator extends StatelessWidget {
 
 /// Environment Banner Widget
 /// Shows a banner at the top of the screen in non-production environments
+/// IMPORTANT: This widget is automatically hidden in production/release builds
+/// per App Store Guideline 2.3.10 - metadata must not include development references
 class EnvironmentBanner extends StatelessWidget {
   final Widget child;
 
@@ -147,7 +158,8 @@ class EnvironmentBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (AppConfig.isProduction) {
+    // CRITICAL: Never show banner in release mode (App Store Guideline 2.3.10 compliance)
+    if (kReleaseMode || AppConfig.isProduction) {
       return child;
     }
 

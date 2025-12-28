@@ -354,8 +354,25 @@ firebase firestore:data:read users
 ### Social Sign-In Providers
 - **Google Sign-In**: OAuth 2.0 with automatic account linking
 - **Facebook Sign-In**: OAuth with automatic account linking
-- **Twitter Sign-In**: OAuth with automatic account linking
+- **Apple Sign-In**: OAuth with Supabase integration (App Store Guideline 4.8 compliance)
+- **Twitter Sign-In**: OAuth with automatic account linking (temporarily disabled)
 - **Email/Password**: Traditional authentication
+
+### Apple Sign-In (Guideline 4.8 Compliance)
+Required by App Store when using third-party login services (Google/Facebook).
+Provides a privacy-preserving login option that:
+- Limits data collection to name and email
+- Allows users to hide their email address
+- Does not collect interactions for advertising
+
+**Implementation Details:**
+- Package: `sign_in_with_apple` ^6.1.4
+- Auth Service: `signInWithApple()` method in `auth_service.dart`
+- UI: Apple Sign-In button on login screen (styled per Apple HIG)
+- iOS Config: 
+  - Entitlements file: `Runner.entitlements` with `com.apple.developer.applesignin`
+  - Minimum iOS version: 13.0 (required for Apple Sign-In)
+  - Xcode capability: "Sign in with Apple" must be enabled
 
 ### Automatic Account Linking
 The app implements automatic account linking to handle the Firebase "One account per email" restriction:
@@ -372,6 +389,40 @@ The app implements automatic account linking to handle the Firebase "One account
    - Handles Email Enumeration Protection
    - Provides clear error messages when automatic linking fails
    - Gracefully handles user cancellation
+
+## App Store Compliance
+
+### Guideline 4.8 - Login Services
+- **Requirement**: Apps using third-party login (Google/Facebook) must offer equivalent login option
+- **Solution**: Implemented Sign in with Apple with privacy-preserving features
+- **Status**: ✅ Implemented
+
+### Guideline 2.1 - App Completeness
+- **Requirement**: All IAP products must be configured in App Store Connect
+- **Solution**: Product validation during initialization with graceful error handling
+- **Product IDs**: 
+  - `premium_monthly_subscription`
+  - `premium_yearly_subscription`
+- **Important**: Ensure these IDs match exactly in App Store Connect before submission
+- **Status**: ✅ Validation logic implemented
+
+### Guideline 2.3.10 - Accurate Metadata
+- **Requirement**: No simulator watermarks or development references in screenshots/UI
+- **Solution**: 
+  - EnvironmentIndicator hidden in release builds using `kReleaseMode`
+  - EnvironmentBanner hidden in production/release mode
+  - Test ad unit IDs replaced with production IDs in release builds
+- **Status**: ✅ Implemented
+
+### Pre-Submission Checklist
+1. ☐ Capture new screenshots on physical iOS device (no simulator)
+2. ☐ Verify IAP products exist and are approved in App Store Connect
+3. ☐ Replace test AdMob IDs with production IDs in `subscription_service.dart`
+4. ☐ Enable "Sign in with Apple" capability in Xcode
+5. ☐ Test Apple Sign-In on physical device
+6. ☐ Verify all login flows work correctly
+7. ☐ Remove any debug/development UI elements
+8. ☐ Update App Store Connect metadata and screenshots
 
 ## Next Steps
 

@@ -1,6 +1,10 @@
+/// Subscription Service
+/// Handles in-app purchases, ad rewards, and subscription management
+/// Updated for App Store Guideline 2.1 compliance - IAP products must be complete and validated
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
@@ -16,13 +20,33 @@ class SubscriptionService {
   final InAppPurchase _iap = InAppPurchase.instance;
 
   // Premium subscription product IDs
+  // IMPORTANT: These must match exactly with product IDs configured in App Store Connect
+  // Before App Store submission, verify these IDs exist in App Store Connect
   static const String premiumMonthlyId = 'premium_monthly_subscription';
   static const String premiumYearlyId = 'premium_yearly_subscription';
 
-  // Ad unit IDs (Test IDs - replace with real ones)
-  static const String rewardedAdUnitId = Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/5224354917' // Test ID
-      : 'ca-app-pub-3940256099942544/1712485313'; // Test ID
+  // Track available products after validation
+  Map<String, ProductDetails> _availableProducts = {};
+  bool _productsValidated = false;
+  String? _productValidationError;
+
+  // Test Ad Unit IDs (Google's official test IDs - safe for development)
+  static const String _testRewardedAdUnitIdAndroid = 'ca-app-pub-3940256099942544/5224354917';
+  static const String _testRewardedAdUnitIdIOS = 'ca-app-pub-3940256099942544/1712485313';
+  
+  // Production Ad Unit IDs (replace with actual IDs before release)
+  // TODO: Replace with production AdMob IDs before App Store submission
+  static const String _prodRewardedAdUnitIdAndroid = 'ca-app-pub-your-publisher-id/your-unit-id';
+  static const String _prodRewardedAdUnitIdIOS = 'ca-app-pub-your-publisher-id/your-unit-id';
+
+  // Get appropriate ad unit ID based on environment
+  static String get rewardedAdUnitId {
+    // Use test IDs in debug mode, production IDs in release
+    if (kDebugMode) {
+      return Platform.isAndroid ? _testRewardedAdUnitIdAndroid : _testRewardedAdUnitIdIOS;
+    }
+    return Platform.isAndroid ? _prodRewardedAdUnitIdAndroid : _prodRewardedAdUnitIdIOS;
+  }
 
   RewardedAd? _rewardedAd;
   bool _isRewardedAdLoaded = false;
@@ -37,9 +61,13 @@ class SubscriptionService {
       // Initialize In-App Purchase
       final bool available = await _iap.isAvailable();
       if (!available) {
-        print('In-App Purchase not available');
+        debugPrint('In-App Purchase not available');
+        _productValidationError = 'In-App Purchase not available on this device';
         return;
       }
+
+      // Validate and load product details (Guideline 2.1 compliance)
+      await _validateProducts();
 
       // Listen to purchase updates
       final Stream<List<PurchaseDetails>> purchaseUpdated = _iap.purchaseStream;
@@ -48,15 +76,59 @@ class SubscriptionService {
       }, onDone: () {
         _subscription?.cancel();
       }, onError: (error) {
-        print('Purchase stream error: $error');
+        debugPrint('Purchase stream error: $error');
       });
 
       // Load rewarded ad
       _loadRewardedAd();
     } catch (e) {
-      print('SubscriptionService initialization error: $e');
+      debugPrint('SubscriptionService initialization error: $e');
     }
   }
+
+  /// Validates that all IAP products are properly configured in App Store Connect
+  /// Required for App Store Guideline 2.1 - products must be complete and reviewable
+  Future<void> _validateProducts() async {
+    try {
+      final Set<String> productIds = {premiumMonthlyId, premiumYearlyId};
+      final ProductDetailsResponse response = await _iap.queryProductDetails(productIds);
+
+      // Check for missing products
+      if (response.notFoundIDs.isNotEmpty) {
+        _productValidationError = 'Products not found in store: ${response.notFoundIDs.join(", ")}';
+        debugPrint('IAP WARNING: $_productValidationError');
+        debugPrint('Please ensure these product IDs are configured in App Store Connect:');
+        for (final id in response.notFoundIDs) {
+          debugPrint('  - $id');
+        }
+      }
+
+      // Store available products for later use
+      for (final product in response.productDetails) {
+        _availableProducts[product.id] = product;
+        debugPrint('IAP Product loaded: ${product.id} - ${product.title} (${product.price})');
+      }
+
+      _productsValidated = true;
+      
+      if (response.error != null) {
+        _productValidationError = 'Error loading products: ${response.error!.message}';
+        debugPrint('IAP Error: $_productValidationError');
+      }
+    } catch (e) {
+      _productValidationError = 'Failed to validate products: $e';
+      debugPrint('IAP Validation Error: $_productValidationError');
+    }
+  }
+
+  /// Check if products are available for purchase
+  bool get areProductsAvailable => _productsValidated && _availableProducts.isNotEmpty;
+
+  /// Get product validation error if any
+  String? get productValidationError => _productValidationError;
+
+  /// Get available product details
+  ProductDetails? getProductDetails(String productId) => _availableProducts[productId];
 
   // Get current user subscription
   Future<SubscriptionModel?> getUserSubscription() async {
@@ -72,7 +144,7 @@ class SubscriptionService {
 
       return SubscriptionModel.fromJson(response);
     } catch (e) {
-      print('Error fetching subscription: $e');
+      debugPrint('Error fetching subscription: $e');
       return null;
     }
   }
@@ -85,7 +157,7 @@ class SubscriptionService {
 
       return subscription.canGenerateSummary;
     } catch (e) {
-      print('Error checking summary generation: $e');
+      debugPrint('Error checking summary generation: $e');
       return false;
     }
   }
@@ -96,7 +168,7 @@ class SubscriptionService {
       final subscription = await getUserSubscription();
       return subscription?.remainingSummaries ?? 0;
     } catch (e) {
-      print('Error getting remaining summaries: $e');
+      debugPrint('Error getting remaining summaries: $e');
       return 0;
     }
   }
@@ -122,13 +194,13 @@ class SubscriptionService {
               ad.dispose();
               _rewardedAd = null;
               _isRewardedAdLoaded = false;
-              print('Rewarded ad failed to show: $error');
+              debugPrint('Rewarded ad failed to show: $error');
             },
           );
         },
         onAdFailedToLoad: (error) {
           _isRewardedAdLoaded = false;
-          print('Rewarded ad failed to load: $error');
+          debugPrint('Rewarded ad failed to load: $error');
           // Retry loading after delay
           Future.delayed(const Duration(seconds: 30), () {
             _loadRewardedAd();
@@ -180,32 +252,60 @@ class SubscriptionService {
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('user_id', user.id);
     } catch (e) {
-      print('Error granting ad reward: $e');
+      debugPrint('Error granting ad reward: $e');
     }
   }
 
-  // Purchase premium subscription
-  Future<bool> purchasePremium({required bool isYearly}) async {
+  /// Purchase premium subscription
+  /// Uses pre-validated products for App Store Guideline 2.1 compliance
+  Future<PurchaseResult> purchasePremium({required bool isYearly}) async {
     try {
       final String productId = isYearly ? premiumYearlyId : premiumMonthlyId;
 
-      // Get product details
-      final ProductDetailsResponse response =
-          await _iap.queryProductDetails({productId});
-
-      if (response.notFoundIDs.isNotEmpty) {
-        print('Product not found: $productId');
-        return false;
+      // Check if products were validated during initialization
+      if (!_productsValidated) {
+        await _validateProducts();
       }
 
-      final productDetails = response.productDetails.first;
-      final purchaseParam = PurchaseParam(productDetails: productDetails);
+      // Use cached product details if available
+      ProductDetails? productDetails = _availableProducts[productId];
+      
+      if (productDetails == null) {
+        // Fallback: try to fetch product details directly
+        final ProductDetailsResponse response =
+            await _iap.queryProductDetails({productId});
 
+        if (response.notFoundIDs.isNotEmpty) {
+          debugPrint('Product not found: $productId');
+          return PurchaseResult(
+            success: false,
+            error: 'Subscription product not available. Please try again later.',
+            errorCode: PurchaseErrorCode.productNotFound,
+          );
+        }
+
+        if (response.productDetails.isEmpty) {
+          return PurchaseResult(
+            success: false,
+            error: 'Unable to load subscription details.',
+            errorCode: PurchaseErrorCode.productNotFound,
+          );
+        }
+
+        productDetails = response.productDetails.first;
+        _availableProducts[productId] = productDetails;
+      }
+
+      final purchaseParam = PurchaseParam(productDetails: productDetails);
       await _iap.buyNonConsumable(purchaseParam: purchaseParam);
-      return true;
+      return PurchaseResult(success: true);
     } catch (e) {
-      print('Purchase error: $e');
-      return false;
+      debugPrint('Purchase error: $e');
+      return PurchaseResult(
+        success: false,
+        error: 'Purchase failed. Please try again.',
+        errorCode: PurchaseErrorCode.unknown,
+      );
     }
   }
 
@@ -216,7 +316,7 @@ class SubscriptionService {
           purchaseDetails.status == PurchaseStatus.restored) {
         _processPurchase(purchaseDetails);
       } else if (purchaseDetails.status == PurchaseStatus.error) {
-        print('Purchase error: ${purchaseDetails.error}');
+        debugPrint('Purchase error: ${purchaseDetails.error}');
       }
 
       if (purchaseDetails.pendingCompletePurchase) {
@@ -248,7 +348,7 @@ class SubscriptionService {
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('user_id', user.id);
     } catch (e) {
-      print('Error processing purchase: $e');
+      debugPrint('Error processing purchase: $e');
     }
   }
 
@@ -257,7 +357,7 @@ class SubscriptionService {
     try {
       await _iap.restorePurchases();
     } catch (e) {
-      print('Restore purchases error: $e');
+      debugPrint('Restore purchases error: $e');
     }
   }
 
@@ -300,7 +400,7 @@ class SubscriptionService {
         'is_premium': subscription.isPremium,
       };
     } catch (e) {
-      print('Error getting usage stats: $e');
+      debugPrint('Error getting usage stats: $e');
       return {};
     }
   }
@@ -326,7 +426,7 @@ class SubscriptionService {
       // Allow one ad per day
       return (response.count ?? 0) == 0;
     } catch (e) {
-      print('Error checking ad availability: $e');
+      debugPrint('Error checking ad availability: $e');
       return false;
     }
   }
@@ -336,4 +436,26 @@ class SubscriptionService {
     _rewardedAd?.dispose();
     _subscription?.cancel();
   }
+}
+
+/// Result of a purchase attempt
+class PurchaseResult {
+  final bool success;
+  final String? error;
+  final PurchaseErrorCode? errorCode;
+
+  PurchaseResult({
+    required this.success,
+    this.error,
+    this.errorCode,
+  });
+}
+
+/// Error codes for purchase failures
+enum PurchaseErrorCode {
+  productNotFound,
+  purchaseCancelled,
+  paymentFailed,
+  networkError,
+  unknown,
 }

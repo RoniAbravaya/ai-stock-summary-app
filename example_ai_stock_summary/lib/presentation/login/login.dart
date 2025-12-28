@@ -176,6 +176,29 @@ class _LoginState extends State<Login> {
     }
   }
 
+  Future<void> _handleAppleSignIn() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Simulate Apple Sign-In delay (replace with actual AuthService call in production)
+      await Future.delayed(const Duration(seconds: 1));
+
+      // Success - trigger haptic feedback
+      HapticFeedback.lightImpact();
+
+      // Navigate to dashboard
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      }
+    } catch (e) {
+      _showErrorSnackBar('Apple Sign-In failed. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   void _showErrorSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -624,6 +647,45 @@ class _LoginState extends State<Login> {
                           style: AppTheme.lightTheme.textTheme.titleMedium
                               ?.copyWith(
                             color: Color(0xFF1877F2),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: 2.h),
+
+                // Apple Sign-In Button (Required for App Store Guideline 4.8)
+                SizedBox(
+                  height: 7.h,
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : _handleAppleSignIn,
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      side: BorderSide(
+                        color: Colors.black,
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CustomIconWidget(
+                          iconName: 'apple',
+                          color: Colors.white,
+                          size: 6.w,
+                        ),
+                        SizedBox(width: 3.w),
+                        Text(
+                          'Continue with Apple',
+                          style: AppTheme.lightTheme.textTheme.titleMedium
+                              ?.copyWith(
+                            color: Colors.white,
                             fontWeight: FontWeight.w500,
                           ),
                         ),

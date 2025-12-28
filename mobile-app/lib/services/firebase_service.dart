@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
@@ -1406,70 +1407,28 @@ class FirebaseService {
   /// - Limits data collection to name and email only
   /// - Allows users to hide their email address
   /// - Does not collect data for advertising purposes
+  /// 
+  /// Implementation notes:
+  /// - iOS: Uses native Sign in with Apple SDK via sign_in_with_apple package
+  /// - Android: Uses Firebase's signInWithProvider which handles the web OAuth flow
   Future<UserCredential> signInWithApple() async {
     try {
       print('🍎 ===== APPLE LOGIN STARTED =====');
       print('🔄 Step 1: Initializing Apple Sign-In...');
       print('🔍 Auth instance available: ${_auth != null}');
       print('🔍 Current user before sign-in: ${_auth?.currentUser?.email ?? "null"}');
+      print('📱 Platform: ${Platform.isIOS ? "iOS" : Platform.isAndroid ? "Android" : "Other"}');
 
       // Use the centralized sign-in or link function for automatic account linking
       final userCredential = await _signInOrLink(() async {
-        // Generate a cryptographically secure nonce for security
-        print('🔄 Step 2: Generating secure nonce...');
-        final rawNonce = _generateNonce();
-        final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
-        print('✅ Nonce generated successfully');
-
-        // Request Apple ID credentials with required scopes
-        print('🔄 Step 3: Requesting Apple ID credentials...');
-        print('📋 Scopes: [email, fullName]');
-        
-        final appleCredential = await SignInWithApple.getAppleIDCredential(
-          scopes: [
-            AppleIDAuthorizationScopes.email,
-            AppleIDAuthorizationScopes.fullName,
-          ],
-          nonce: hashedNonce,
-        );
-
-        print('✅ Apple ID credential received');
-        print('🔑 Identity token present: ${appleCredential.identityToken != null}');
-        print('📧 Email: ${appleCredential.email ?? "hidden by user"}');
-        print('👤 Full name: ${appleCredential.givenName ?? "not provided"} ${appleCredential.familyName ?? ""}');
-
-        // Check if we received an identity token
-        if (appleCredential.identityToken == null) {
-          print('❌ No identity token received from Apple');
-          throw Exception('Apple Sign-In failed: No identity token received');
+        // Platform-specific implementation
+        if (Platform.isIOS) {
+          // iOS: Use native Sign in with Apple SDK
+          return await _signInWithAppleNative();
+        } else {
+          // Android/Other: Use Firebase's signInWithProvider for web-based OAuth
+          return await _signInWithAppleViaFirebase();
         }
-
-        // Create an OAuthCredential for Firebase using Apple's id token
-        print('🔄 Step 4: Creating Firebase OAuth credential...');
-        final oauthCredential = OAuthProvider('apple.com').credential(
-          idToken: appleCredential.identityToken,
-          rawNonce: rawNonce,
-        );
-        print('✅ Firebase OAuth credential created');
-
-        // Sign in to Firebase with the Apple credential
-        print('🔄 Step 5: Signing in to Firebase...');
-        final userCredential = await auth.signInWithCredential(oauthCredential);
-
-        // Update display name if provided by Apple (only on first sign-in)
-        if (appleCredential.givenName != null && userCredential.user != null) {
-          final displayName = '${appleCredential.givenName} ${appleCredential.familyName ?? ''}'.trim();
-          if (displayName.isNotEmpty) {
-            try {
-              await userCredential.user!.updateDisplayName(displayName);
-              print('✅ Display name updated to: $displayName');
-            } catch (e) {
-              print('⚠️ Failed to update display name: $e');
-            }
-          }
-        }
-
-        return userCredential;
       }, 'Apple');
 
       print('🎉 Step 6: Firebase sign-in completed!');
@@ -1575,6 +1534,91 @@ class FirebaseService {
     }
   }
 
+  /// iOS-specific: Uses native Sign in with Apple SDK
+  /// This provides the best user experience on iOS with native system dialogs
+  Future<UserCredential> _signInWithAppleNative() async {
+    print('🍎 Using native iOS Sign in with Apple...');
+    
+    // Generate a cryptographically secure nonce for security
+    print('🔄 Step 2: Generating secure nonce...');
+    final rawNonce = _generateNonce();
+    final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+    print('✅ Nonce generated successfully');
+
+    // Request Apple ID credentials with required scopes
+    print('🔄 Step 3: Requesting Apple ID credentials...');
+    print('📋 Scopes: [email, fullName]');
+    
+    final appleCredential = await SignInWithApple.getAppleIDCredential(
+      scopes: [
+        AppleIDAuthorizationScopes.email,
+        AppleIDAuthorizationScopes.fullName,
+      ],
+      nonce: hashedNonce,
+    );
+
+    print('✅ Apple ID credential received');
+    print('🔑 Identity token present: ${appleCredential.identityToken != null}');
+    print('📧 Email: ${appleCredential.email ?? "hidden by user"}');
+    print('👤 Full name: ${appleCredential.givenName ?? "not provided"} ${appleCredential.familyName ?? ""}');
+
+    // Check if we received an identity token
+    if (appleCredential.identityToken == null) {
+      print('❌ No identity token received from Apple');
+      throw Exception('Apple Sign-In failed: No identity token received');
+    }
+
+    // Create an OAuthCredential for Firebase using Apple's id token
+    print('🔄 Step 4: Creating Firebase OAuth credential...');
+    final oauthCredential = OAuthProvider('apple.com').credential(
+      idToken: appleCredential.identityToken,
+      rawNonce: rawNonce,
+    );
+    print('✅ Firebase OAuth credential created');
+
+    // Sign in to Firebase with the Apple credential
+    print('🔄 Step 5: Signing in to Firebase...');
+    final userCredential = await auth.signInWithCredential(oauthCredential);
+
+    // Update display name if provided by Apple (only on first sign-in)
+    if (appleCredential.givenName != null && userCredential.user != null) {
+      final displayName = '${appleCredential.givenName} ${appleCredential.familyName ?? ''}'.trim();
+      if (displayName.isNotEmpty) {
+        try {
+          await userCredential.user!.updateDisplayName(displayName);
+          print('✅ Display name updated to: $displayName');
+        } catch (e) {
+          print('⚠️ Failed to update display name: $e');
+        }
+      }
+    }
+
+    return userCredential;
+  }
+
+  /// Android/Web: Uses Firebase's signInWithProvider for web-based OAuth
+  /// This opens a Chrome Custom Tab / browser for Apple's OAuth flow
+  Future<UserCredential> _signInWithAppleViaFirebase() async {
+    print('🍎 Using Firebase signInWithProvider for Apple (Android/Web)...');
+    
+    // Create Apple provider with scopes
+    print('🔄 Step 2: Creating AppleAuthProvider...');
+    final appleProvider = AppleAuthProvider();
+    appleProvider.addScope('email');
+    appleProvider.addScope('name');
+    print('✅ AppleAuthProvider created with scopes');
+    
+    // Sign in using Firebase's built-in provider flow
+    // This handles the web-based OAuth automatically
+    print('🔄 Step 3: Calling signInWithProvider...');
+    print('🌐 This will open a browser/Chrome Custom Tab for Apple login');
+    
+    final userCredential = await _auth!.signInWithProvider(appleProvider);
+    
+    print('✅ Firebase signInWithProvider completed');
+    return userCredential;
+  }
+
   /// Generates a cryptographically secure random nonce
   /// Used for Apple Sign-In to prevent replay attacks
   String _generateNonce([int length = 32]) {
@@ -1584,28 +1628,38 @@ class FirebaseService {
   }
 
   /// Internal method to get Apple credential and sign in (for account linking)
+  /// Uses platform-specific implementation
   Future<UserCredential> _signInWithAppleCredential() async {
-    final rawNonce = _generateNonce();
-    final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+    if (Platform.isIOS) {
+      // iOS: Use native Sign in with Apple
+      final rawNonce = _generateNonce();
+      final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
 
-    final appleCredential = await SignInWithApple.getAppleIDCredential(
-      scopes: [
-        AppleIDAuthorizationScopes.email,
-        AppleIDAuthorizationScopes.fullName,
-      ],
-      nonce: hashedNonce,
-    );
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
 
-    if (appleCredential.identityToken == null) {
-      throw Exception('Apple Sign-In failed: No identity token received');
+      if (appleCredential.identityToken == null) {
+        throw Exception('Apple Sign-In failed: No identity token received');
+      }
+
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+      );
+
+      return await auth.signInWithCredential(oauthCredential);
+    } else {
+      // Android/Web: Use Firebase's signInWithProvider
+      final appleProvider = AppleAuthProvider();
+      appleProvider.addScope('email');
+      appleProvider.addScope('name');
+      return await _auth!.signInWithProvider(appleProvider);
     }
-
-    final oauthCredential = OAuthProvider('apple.com').credential(
-      idToken: appleCredential.identityToken,
-      rawNonce: rawNonce,
-    );
-
-    return await auth.signInWithCredential(oauthCredential);
   }
 
   /// Setup admin user after authentication

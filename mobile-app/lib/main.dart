@@ -647,6 +647,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         side: const BorderSide(color: Color(0xFF1877F2)),
                       ),
                     ),
+                    // Apple Sign-In - Required for App Store Guideline 4.8
+                    // Shows on iOS (native) and Android (via Firebase web OAuth)
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed: _isLoading ? null : _signInWithApple,
